@@ -1,16 +1,15 @@
-/* --- カラーパレット設定（ロゴから抽出） --- */
+/* --- カラーパレット --- */
 :root {
-    --color-black: #0a0a0a;       /* 背景の漆黒 */
+    --color-black: #0a0a0a;
     --color-white: #ffffff;
-    --color-yellow: #f6d926;      /* ロゴの黄色 */
-    --color-blue: #213694;        /* ロゴの青色 */
-    --color-green: #88c484;       /* ロゴの緑色 */
+    --color-yellow: #f6d926;
+    --color-blue: #213694;
+    --color-green: #88c484;
     --color-gray: #333333;
-    --color-glass: rgba(255, 255, 255, 0.03); /* グラスモーフィズム */
-    --color-border: rgba(255, 255, 255, 0.1);
+    --glass: rgba(255, 255, 255, 0.05);
+    --border: rgba(255, 255, 255, 0.1);
 }
 
-/* --- ベースリセット --- */
 * { margin: 0; padding: 0; box-sizing: border-box; scroll-behavior: smooth; }
 
 body {
@@ -21,291 +20,112 @@ body {
     overflow-x: hidden;
 }
 
-/* --- 1. ナビゲーションバー --- */
+/* --- ナビゲーション --- */
 .global-nav {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 70px;
     background: rgba(10, 10, 10, 0.85);
     backdrop-filter: blur(10px);
     z-index: 1000;
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--border);
 }
-
 .nav-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    height: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 20px;
+    max-width: 1200px; margin: 0 auto; height: 100%;
+    display: flex; justify-content: space-between; align-items: center; padding: 0 20px;
 }
-
-.nav-logo a {
-    color: var(--color-white);
-    text-decoration: none;
-    font-size: 1.5rem;
-    font-weight: 900;
-    letter-spacing: 2px;
-}
-
-.nav-links {
-    list-style: none;
-    display: flex;
-    align-items: center;
-    gap: 25px;
-}
-
-.nav-links a:not(.nav-icons a) {
-    color: #cccccc;
-    text-decoration: none;
-    font-size: 0.9rem;
-    font-weight: 700;
-    letter-spacing: 1px;
-    transition: color 0.3s ease;
-}
-
+.nav-logo a { color: var(--color-white); text-decoration: none; font-size: 1.5rem; font-weight: 900; letter-spacing: 2px; }
+.nav-links { list-style: none; display: flex; align-items: center; gap: 25px; }
+.nav-links a:not(.nav-icons a) { color: #ccc; text-decoration: none; font-size: 0.9rem; font-weight: 700; transition: color 0.3s; }
 .nav-links a:hover { color: var(--color-yellow); }
-
-/* ナビのSNSアイコンエリア */
 .nav-icons { display: flex; gap: 15px; margin-left: 20px; }
-.nav-icons a {
-    color: var(--color-white);
-    font-size: 1.2rem;
-    text-decoration: none;
-    transition: transform 0.3s ease;
-}
+.nav-icons a { color: var(--color-white); font-size: 1.2rem; transition: transform 0.3s; }
 .nav-icons a:hover { transform: scale(1.15); }
 
-/* --- 2. ヒーローセクション --- */
+/* --- ヒーローセクション --- */
 .hero-section {
-    position: relative;
-    height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding-top: 70px;
+    position: relative; height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; padding-top: 70px;
 }
-
 .hero-content { position: relative; z-index: 10; }
-.hero-logo {
-    width: 200px;
-    height: auto;
-    margin-bottom: 30px;
-    filter: drop-shadow(0 0 20px rgba(246, 217, 38, 0.2));
-    animation: float 6s ease-in-out infinite;
-}
+.hero-logo { width: 200px; margin-bottom: 30px; filter: drop-shadow(0 0 20px rgba(246, 217, 38, 0.2)); animation: float 6s ease-in-out infinite; }
 .hero-title { font-size: 3.5rem; font-weight: 900; letter-spacing: 5px; margin-bottom: 10px; }
 .hero-subtitle { font-size: 1.1rem; color: var(--color-yellow); letter-spacing: 4px; font-weight: 700; }
-
-/* 背景の装飾 */
 .decoration { position: absolute; z-index: 1; opacity: 0.15; filter: blur(40px); }
 .circle-green { width: 300px; height: 300px; background-color: var(--color-green); border-radius: 50%; top: 20%; left: 10%; }
 .square-blue { width: 400px; height: 400px; background-color: var(--color-blue); bottom: -10%; right: -5%; transform: rotate(45deg); }
 
 @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-15px); } }
 
-/* --- メインコンテンツ共通 --- */
-.main-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 100px 20px;
-}
-
+/* --- メイン・共通カード --- */
+.main-content { max-width: 1200px; margin: 0 auto; padding: 100px 20px; }
 .section-title {
-    font-size: 2.5rem;
-    font-weight: 900;
-    letter-spacing: 4px;
-    text-align: center;
-    margin-bottom: 60px;
-    position: relative;
-    display: inline-block;
-    left: 50%;
-    transform: translateX(-50%);
+    font-size: 2.5rem; font-weight: 900; letter-spacing: 4px; text-align: center; margin-bottom: 60px; position: relative;
 }
-
 .section-title::after {
-    content: '';
-    position: absolute;
-    bottom: -15px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60px;
-    height: 6px;
-    background-color: var(--color-yellow);
-    border-radius: 3px;
+    content: ''; position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); width: 60px; height: 6px; background-color: var(--color-yellow); border-radius: 3px;
 }
-
-/* カード共通 (Glassmorphism) */
-.info-card, .embed-card {
-    background: var(--color-glass);
-    border: 1px solid var(--color-border);
-    border-radius: 20px;
-    padding: 40px;
-    backdrop-filter: blur(5px);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+.glass-card {
+    background: var(--glass); border: 1px solid var(--border); border-radius: 20px; padding: 40px; backdrop-filter: blur(5px); transition: transform 0.3s;
 }
+.glass-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(246, 217, 38, 0.05); }
 
-.info-card:hover, .embed-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(246, 217, 38, 0.1); /* イエローの光 */
-}
+/* --- ABOUT --- */
+.about-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-bottom: 100px; }
+.info-icon { display: block; font-size: 3rem; text-align: center; margin-bottom: 20px; }
+.col-yellow { color: var(--color-yellow); } .col-blue { color: var(--color-blue); } .col-green { color: var(--color-green); }
+.info-value { font-size: 2.2rem; font-weight: 900; color: var(--color-yellow); text-align: center; margin-bottom: 10px; }
+.info-card h3 { text-align: center; margin-bottom: 20px; }
+.info-card p { color: #ccc; font-size: 0.95rem; text-align: center; }
+.info-card .info-list { text-align: left; max-width: 250px; margin: 0 auto 8px auto; }
 
-/* コンテンツタイトルカラー */
-.about-section h3, .socials-section h3 {
-    font-size: 1.3rem;
-    margin-bottom: 25px;
-    color: var(--color-white);
-    letter-spacing: 2px;
-    text-align: center;
-}
-
-/* --- A. ABOUT US (部の概要3点のみ) --- */
-.about-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 30px;
-    margin-bottom: 100px;
-}
-
-.info-icon {
-    display: block;
-    font-size: 3rem;
-    text-align: center;
-    margin-bottom: 20px;
-}
-
-/* カラークラス */
-.col-yellow { color: var(--color-yellow); }
-.col-blue { color: var(--color-blue); }
-.col-green { color: var(--color-green); }
-
-.info-value {
-    font-size: 2.2rem;
-    font-weight: 900;
-    color: var(--color-yellow);
-    text-align: center;
-    margin-bottom: 10px;
-}
-
-.info-card p {
-    color: #cccccc;
-    font-size: 0.95rem;
-    text-align: center;
-}
-
-.info-card .info-list {
-    text-align: left;
-    max-width: 250px;
-    margin: 0 auto 8px auto;
-}
-
-/* --- B. SOCIALS (SNS埋め込み) --- */
+/* --- SOCIALS (X & Insta) --- */
 .socials-section { margin-bottom: 100px; }
-.socials-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: 40px;
-}
+.socials-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 40px; }
+.embed-card h3 { text-align: center; margin-bottom: 25px; font-size: 1.3rem; }
 
-.embed-card { display: flex; flex-direction: column; align-items: center; }
+/* X Embed */
+.x-embed-wrapper { height: 450px; overflow-y: auto; border-radius: 10px; margin-bottom: 15px; }
+.fallback-link { text-align: center; font-size: 0.85rem; color: #888; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;}
+.fallback-link p { margin-bottom: 10px; }
 
-.insta-embed p {
-    color: #cccccc;
-    margin-bottom: 25px;
-    text-align: center;
-}
+/* Insta Card (埋め込み風) */
+.insta-profile-card { text-align: center; padding: 30px 10px; }
+.insta-large-icon { font-size: 4rem; color: var(--color-yellow); margin-bottom: 15px; }
+.insta-profile-card h4 { font-size: 1.5rem; margin-bottom: 15px; letter-spacing: 1px;}
+.insta-profile-card p { color: #ccc; margin-bottom: 30px; line-height: 1.8; }
 
-/* SNSボタン */
+/* SNS Buttons */
 .social-button {
-    display: inline-block;
-    padding: 12px 35px;
-    border-radius: 30px;
-    text-decoration: none;
-    font-weight: 700;
-    letter-spacing: 1px;
-    transition: all 0.3s ease;
+    display: inline-block; padding: 12px 35px; border-radius: 30px; text-decoration: none; font-weight: 700; transition: all 0.3s;
 }
+.insta-btn { background: var(--color-yellow); color: var(--color-black); }
+.insta-btn:hover { box-shadow: 0 0 15px rgba(246, 217, 38, 0.4); }
+.x-btn { background: var(--color-white); color: var(--color-black); padding: 8px 25px; }
+.x-btn:hover { background: #ccc; }
 
-.insta-btn {
-    background: var(--color-yellow);
-    color: var(--color-black);
-}
-.insta-btn:hover {
-    box-shadow: 0 0 15px rgba(246, 217, 38, 0.4);
-}
-
-/* Xの埋め込みタイムラインの高さ固定 */
-.x-embed {
-    height: 500px;
-    overflow: hidden;
-}
-.x-embed script + * {
-    width: 100% !important;
-    height: calc(100% - 60px) !important;
-}
-
-/* --- C. CALENDAR --- */
+/* --- CALENDAR --- */
 .calendar-section { margin-bottom: 120px; }
-.calendar-embed { padding: 10px; } /* カレンダーは端まで広げる */
-.calendar-embed iframe { border-radius: 15px; height: 600px; }
-.embed-hint { color: #888; font-size: 0.8rem; margin-top: 10px; text-align: center; }
+.calendar-embed { padding: 0; border-radius: 20px; overflow: hidden; background: var(--glass); border: 1px solid var(--border); }
+.calendar-embed iframe { border-radius: 20px; }
 
-/* --- D. GALLERY (ドライブへのリンク) --- */
-.gallery-section { text-align: center; }
+/* --- GALLERY --- */
+.gallery-section { text-align: center; margin-bottom: 80px; }
 .gallery-content { max-width: 800px; margin: 0 auto; }
-.gallery-content p {
-    font-size: 1.15rem;
-    color: #cccccc;
-    line-height: 1.9;
-    margin-bottom: 50px;
-}
-
-/* GALLERYボタン (ロゴブルーを基調) */
+.gallery-content p { font-size: 1.15rem; color: #ccc; line-height: 1.9; margin-bottom: 50px; }
 .gallery-button {
-    display: inline-block;
-    padding: 20px 60px;
-    background-color: var(--color-blue);
-    color: var(--color-white);
-    border-radius: 50px;
-    font-size: 1.1rem;
-    font-weight: 900;
-    text-decoration: none;
-    letter-spacing: 2px;
-    transition: all 0.3s ease;
+    display: inline-block; padding: 20px 60px; background-color: var(--color-blue); color: var(--color-white); border-radius: 50px; font-size: 1.1rem; font-weight: 900; text-decoration: none; transition: all 0.3s;
 }
 .gallery-button i { margin-left: 10px; }
-.gallery-button:hover {
-    box-shadow: 0 0 25px rgba(33, 54, 148, 0.5); /* ブルーの光 */
-    transform: translateY(-2px);
-}
+.gallery-button:hover { box-shadow: 0 0 25px rgba(33, 54, 148, 0.5); transform: translateY(-2px); }
 
 /* --- フッター --- */
-footer {
-    text-align: center;
-    padding: 40px 20px;
-    background-color: #050505;
-    border-top: 1px solid var(--color-border);
-    font-size: 0.8rem;
-    color: #888;
-}
+footer { text-align: center; padding: 40px 20px; background-color: #050505; border-top: 1px solid var(--border); font-size: 0.8rem; color: #888; }
 
-/* --- スマホ向けレスポンス対応 --- */
+/* --- スマホ対応 --- */
 @media (max-width: 768px) {
-    .nav-container { padding: 0 15px; }
-    .nav-links { gap: 10px; }
-    .nav-links a:not(.nav-icons a) { display: none; } /* テキストリンクは隠す */
-    
-    .hero-title { font-size: 2.8rem; letter-spacing: 3px; }
+    .nav-links a:not(.nav-icons a) { display: none; }
+    .hero-title { font-size: 2.8rem; }
     .hero-logo { width: 160px; }
-    
     .section-title { font-size: 2rem; }
-    .about-grid, .socials-grid { grid-template-columns: 1fr; }
-    
-    .info-card, .embed-card { padding: 30px; }
-    .social-button { padding: 10px 25px; font-size: 0.9rem; }
-    .x-embed, .calendar-embed iframe { height: 400px; }
-    
+    .glass-card { padding: 30px 20px; }
     .gallery-button { padding: 15px 30px; font-size: 1rem; }
 }
