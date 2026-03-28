@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>神戸大学美術部 凌美会 | RYOBI Art Club</title>
-    <meta name="description" content="神戸大学美術部 凌美会（RYOBI）の公式ウェブサイトです。">
+    <title>神戸大学美術部凌美会 | RYOBI Art Club</title>
+    <meta name="description" content="神戸大学美術部凌美会（RYOBI）の公式ウェブサイトです。">
     <link rel="stylesheet" href="stylesheet.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
@@ -14,19 +14,20 @@
     <nav class="global-nav">
         <div class="nav-container">
             <div class="nav-logo">
-                <a href="#home">
-                    <img src="logo.png" alt="凌美会 ロゴ" class="nav-logo-img">
-                    神戸大学美術部 凌美会
-                </a>
+                <img src="logo.png" alt="凌美会 ロゴ" class="nav-logo-image">
+                <a href="#home">神戸大学美術部凌美会</a>
             </div>
             <ul class="nav-links">
                 <li><a href="#about">ABOUT</a></li>
-                <li><a href="#socials">SOCIALS</a></li>
+                <li><a href="#social">SOCIAL</a></li>
                 <li><a href="#calendar">CALENDAR</a></li>
                 <li><a href="#gallery">GALLERY</a></li>
                 <li class="nav-icons">
                     <a href="https://www.instagram.com/ryobi.welcome/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
                         <i class="fa-brands fa-instagram"></i>
+                    </a>
+                    <a href="https://x.com/art_club_ryobi?s=21" target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)">
+                        <i class="fa-brands fa-x-twitter"></i>
                     </a>
                     <a href="mailto:ryobi.kobe@gmail.com" aria-label="Email">
                         <i class="fa-regular fa-envelope"></i>
@@ -53,37 +54,37 @@
             <div class="about-grid">
                 <div class="info-card glass-card">
                     <i class="fa-solid fa-users info-icon col-yellow"></i>
-                    <h3>部員数</h3>
-                    <p class="info-value">約 40 名</p>
-                    <p>デジタル、アナログ、多様なジャンルの部員が在籍しています。</p>
+                    <h3 class="info-title-large">部員数</h3>
+                    <p class="info-value-large">約 40 名</p>
+                    <p class="info-text-large">デジタル、アナログ、多様なジャンルの部員が在籍しています。</p>
                 </div>
                 <div class="info-card glass-card">
                     <i class="fa-solid fa-circle-info info-icon col-blue"></i>
-                    <h3>基本情報</h3>
-                    <p class="info-list">毎週 火・木曜日 17:00〜</p>
-                    <p class="info-list">六甲台第一キャンパス</p>
-                    <p class="info-list">部費：半期 3,000円</p>
+                    <h3 class="info-title-large">基本情報</h3>
+                    <p class="info-list-large">毎週 火・木曜日 17:00〜</p>
+                    <p class="info-list-large">六甲台第一キャンパス</p>
+                    <p class="info-list-large">部費：半期 3,000円</p>
                 </div>
                 <div class="info-card glass-card">
                     <i class="fa-solid fa-palette info-icon col-green"></i>
-                    <h3>使える物</h3>
-                    <p>油彩・水彩用具、画架、大型プリンター、タブレット、各種ソフト など</p>
+                    <h3 class="info-title-large">使える物</h3>
+                    <p class="info-text-large">油彩・水彩用具、画架、大型プリンター、タブレット、各種ソフト など</p>
                 </div>
             </div>
         </section>
 
-        <section id="socials" class="socials-section">
-            <h2 class="section-title">SOCIALS</h2>
-            <div class="socials-grid">
+        <section id="social" class="socials-section">
+            <h2 class="section-title">SOCIAL</h2>
+            <div class="socials-grid single-card">
                 
-                <div class="embed-card glass-card">
-                    <h3>Instagram</h3>
-                    <div class="insta-profile-card">
-                        <i class="fa-brands fa-instagram insta-large-icon"></i>
+                <div class="embed-card glass-card insta-card-large">
+                    <h3>Instagram <i class="fa-brands fa-instagram"></i></h3>
+                    <div class="social-profile-card">
+                        <i class="fa-brands fa-instagram social-large-icon icon-insta"></i>
                         <h4>@ryobi.welcome</h4>
                         <p>日々の活動やイベントの様子、<br>作品のメイキングなどを投稿しています。</p>
                         <a href="https://www.instagram.com/ryobi.welcome/" target="_blank" rel="noopener noreferrer" class="social-button insta-btn">
-                            プロフィールを見る
+                            Instagram を見る
                         </a>
                     </div>
                 </div>
@@ -101,15 +102,18 @@
         <section id="gallery" class="gallery-section">
             <h2 class="section-title">GALLERY</h2>
             <div class="gallery-content">
-                <p>凌美会のこれまでの作品や展示の様子です。</p>
-                
-                <div class="gallery-images">
-                    <img src="描いた絵その６.jpg" alt="凌美会 作品1" class="gallery-img">
-                    <img src="スクリーンショット 2026-03-29 015358.jpg" alt="凌美会 作品2" class="gallery-img">
-                    <img src="スクリーンショット 2026-03-29 015346.jpg" alt="凌美会 作品3" class="gallery-img">
+                <div class="gallery-grid">
+                    <div class="gallery-item glass-card">
+                        <img src="描いた絵その６.jpg" alt="部員の過去作 1">
+                    </div>
+                    <div class="gallery-item glass-card">
+                        <img src="スクリーンショット 2026-03-29 015358.jpg" alt="部員の過去作 2">
+                    </div>
+                    <div class="gallery-item glass-card">
+                        <img src="スクリーンショット 2026-03-29 015346.jpg" alt="部員の過去作 3">
+                    </div>
                 </div>
-
-                <p>すべての作品は、Google ドライブにて公開しています。<br>以下のボタンからご覧ください。</p>
+                <p>凌美会のこれまでの作品や展示の様子は、Google ドライブにて公開しています。<br>以下のボタンからご覧ください。</p>
                 <a href="https://drive.google.com/drive/folders/1JL_rBcYzzmQ0pVwXagi8iHu1-XCBa-JF?usp=sharing" target="_blank" rel="noopener noreferrer" class="gallery-button">
                     過去作をGoogleドライブで見る <i class="fa-solid fa-up-right-from-square"></i>
                 </a>
@@ -119,7 +123,7 @@
     </main>
 
     <footer>
-        <p>&copy; 2026 神戸大学美術部 凌美会 (RYOBI). All rights reserved.</p>
+        <p>&copy; 2026 神戸大学美術部凌美会 (RYOBI). All rights reserved.</p>
     </footer>
 
 </body>
