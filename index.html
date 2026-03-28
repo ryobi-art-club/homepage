@@ -6,7 +6,7 @@
     <title>凌美会 | RYOBI Art Club</title>
     <meta name="description" content="凌美会（RYOBI）の公式ウェブサイトです。">
     <link rel="stylesheet" href="stylesheet.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -51,20 +51,20 @@
         <section id="about" class="about-section">
             <h2 class="section-title">ABOUT US</h2>
             <div class="about-grid">
-                <div class="info-card">
+                <div class="info-card glass-card">
                     <i class="fa-solid fa-users info-icon col-yellow"></i>
                     <h3>部員数</h3>
                     <p class="info-value">約 40 名</p>
                     <p>デジタル、アナログ、多様なジャンルの部員が在籍しています。</p>
                 </div>
-                <div class="info-card">
+                <div class="info-card glass-card">
                     <i class="fa-solid fa-circle-info info-icon col-blue"></i>
                     <h3>基本情報</h3>
                     <p class="info-list">毎週 火・木曜日 17:00〜</p>
-                    <p class="info-list">〇〇会館 3F アトリエ</p>
+                    <p class="info-list">六甲台第一キャンパス</p>
                     <p class="info-list">部費：半期 3,000円</p>
                 </div>
-                <div class="info-card">
+                <div class="info-card glass-card">
                     <i class="fa-solid fa-palette info-icon col-green"></i>
                     <h3>使える物</h3>
                     <p>油彩・水彩用具、画架、大型プリンター、タブレット、各種ソフト など</p>
@@ -75,25 +75,38 @@
         <section id="socials" class="socials-section">
             <h2 class="section-title">SOCIALS</h2>
             <div class="socials-grid">
-                <div class="embed-card x-embed">
+                
+                <div class="embed-card glass-card x-embed-container">
                     <h3>X <i class="fa-brands fa-x-twitter"></i></h3>
-                    <a class="twitter-timeline" data-lang="ja" data-theme="dark" href="https://twitter.com/art_club_ryobi?ref_src=twsrc%5Etfw">Tweets by art_club_ryobi</a> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+                    <div class="x-embed-wrapper">
+                        <a class="twitter-timeline" data-height="450" data-theme="dark" href="https://twitter.com/art_club_ryobi?ref_src=twsrc%5Etfw">Tweets by art_club_ryobi</a> 
+                        <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+                    </div>
+                    <div class="fallback-link">
+                        <p>※タイムラインが表示されない場合はこちら</p>
+                        <a href="https://x.com/art_club_ryobi?s=21" target="_blank" rel="noopener noreferrer" class="social-button x-btn">Xで確認する</a>
+                    </div>
                 </div>
-                <div class="embed-card insta-embed">
+
+                <div class="embed-card glass-card insta-embed-container">
                     <h3>Instagram <i class="fa-brands fa-instagram"></i></h3>
-                    <p>日々の活動やイベントの様子を投稿しています。</p>
-                    <a href="https://www.instagram.com/ryobi.welcome/" target="_blank" rel="noopener noreferrer" class="social-button insta-btn">
-                        @ryobi.welcome
-                    </a>
+                    <div class="insta-profile-card">
+                        <i class="fa-brands fa-instagram insta-large-icon"></i>
+                        <h4>@ryobi.welcome</h4>
+                        <p>日々の活動やイベントの様子、<br>作品のメイキングなどを投稿しています。</p>
+                        <a href="https://www.instagram.com/ryobi.welcome/" target="_blank" rel="noopener noreferrer" class="social-button insta-btn">
+                            プロフィールを見る
+                        </a>
+                    </div>
                 </div>
+                
             </div>
         </section>
 
         <section id="calendar" class="calendar-section">
             <h2 class="section-title">CALENDAR</h2>
-            <div class="embed-card calendar-embed">
-                <iframe src="https://calendar.google.com/calendar/embed?height=600&wkst=1&bgcolor=%230a0a0a&ctz=Asia%2FTokyo&src=<iframe src="https://calendar.google.com/calendar/embed?src=ryobi.kobe%40gmail.com&ctz=UTC" style="border: 0" width="800" height="600" frameborder="0" scrolling="no"></iframe>&color=%23f6d926&mode=WEEK" style="border:solid 1px rgba(255,255,255,0.1)" width="100%" height="600" frameborder="0" scrolling="no"></iframe>
-                <p class="embed-hint">※Googleカレンダーの埋め込みIDを差し替えると表示されます。</p>
+            <div class="calendar-embed">
+                <iframe src="https://calendar.google.com/calendar/embed?height=600&wkst=1&bgcolor=%230a0a0a&ctz=Asia%2FTokyo&src=ryobi.kobe%40gmail.com&color=%23f6d926&mode=MONTH" style="border:solid 1px rgba(255,255,255,0.1)" width="100%" height="600" frameborder="0" scrolling="no"></iframe>
             </div>
         </section>
 
