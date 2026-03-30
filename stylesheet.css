@@ -392,35 +392,97 @@ body {
     justify-content: center;
 }
 
-.feed-card {
+.latest-posts-card {
     width: 100%;
-    max-width: 640px;
-    padding: 16px;
+    padding: 24px;
 }
 
-.embed-shell {
+.feed-meta-row {
     display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    overflow: hidden;
-    border-radius: 18px;
-    background: rgba(255,255,255,0.03);
+    justify-content: space-between;
+    align-items: end;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.feed-handle {
+    font-size: 1.3rem;
+}
+
+.feed-status {
+    color: rgba(255,255,255,0.68);
+    padding: 12px 4px;
+}
+
+.ig-feed-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.ig-post-card {
+    display: block;
+    text-decoration: none;
+    color: var(--color-white);
+    background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.08);
-    padding: 6px;
+    border-radius: 18px;
+    overflow: hidden;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
-.instagram-shell {
-    min-height: 620px;
+.ig-post-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 32px rgba(0,0,0,0.22);
+    border-color: rgba(246,217,38,0.22);
 }
 
-.instagram-media {
-    margin: 0 auto !important;
-    width: 100% !important;
-    max-width: 540px !important;
-    min-width: 280px !important;
-    background: #111 !important;
-    border: 0 !important;
-    border-radius: 16px !important;
+.ig-post-image-wrap {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    background: rgba(255,255,255,0.04);
+}
+
+.ig-post-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.ig-post-image.fallback {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(246,217,38,0.18), rgba(33,54,148,0.22));
+}
+
+.ig-media-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    background: rgba(10,10,10,0.72);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.ig-post-body {
+    padding: 14px 14px 16px;
+}
+
+.ig-post-caption {
+    font-size: 0.95rem;
+    line-height: 1.65;
+    color: rgba(255,255,255,0.9);
+    margin-bottom: 8px;
+}
+
+.ig-post-date {
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.58);
 }
 
 .glass-frame {
@@ -516,6 +578,10 @@ footer {
 }
 
 @media (max-width: 1024px) {
+    .ig-feed-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .gallery-panel {
         flex-direction: column;
         align-items: flex-start;
@@ -565,6 +631,10 @@ footer {
         padding-left: 64px;
     }
 
+    .ig-feed-grid {
+        grid-template-columns: 1fr;
+    }
+
     .gallery-copy {
         align-items: flex-start;
     }
@@ -587,16 +657,12 @@ footer {
     }
 
     .about-card,
-    .feed-card,
+    .latest-posts-card,
     .gallery-panel {
         padding: 22px;
     }
 
     .timeline-content {
         font-size: 1.02rem;
-    }
-
-    .instagram-shell {
-        min-height: 540px;
     }
 }
