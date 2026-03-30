@@ -182,14 +182,16 @@
             </div>
 
             <div class="updates-centered">
-                <article class="feed-card glass-card simple-insta-card">
-                    <div class="embed-shell instagram-shell" id="instagram-embed-root">
-                        <blockquote
-                            class="instagram-media"
-                            data-instgrm-permalink="https://www.instagram.com/ryobi.welcome/"
-                            data-instgrm-version="14">
-                        </blockquote>
+                <article class="feed-card glass-card latest-posts-card">
+                    <div class="feed-meta-row">
+                        <div>
+                            <p class="eyebrow">LATEST POSTS</p>
+                            <h4 class="feed-handle">@ryobi.welcome</h4>
+                        </div>
                     </div>
+
+                    <p id="ig-feed-status" class="feed-status">最新投稿を読み込んでいます…</p>
+                    <div id="ig-feed-grid" class="ig-feed-grid" hidden></div>
                 </article>
             </div>
         </section>
@@ -221,8 +223,8 @@
                         <i class="fa-regular fa-images"></i>
                     </div>
                     <div class="gallery-text">
-                        <h4>Google Driveで見る</h4>
-                        <p>作品や展示の記録を一覧で見られます。</p>
+                        <h4>作品や展示の記録</h4>
+                        <p>Google Driveに写真をまとめています。</p>
                     </div>
                 </div>
                 <a href="https://drive.google.com/drive/folders/1JL_rBcYzzmQ0pVwXagi8iHu1-XCBa-JF?usp=sharing" target="_blank" rel="noopener noreferrer" class="gallery-button compact-gallery-button">
@@ -236,26 +238,93 @@
         <p>&copy; 2026 神戸大学美術部凌美会</p>
     </footer>
 
-    <script async src="https://www.instagram.com/embed.js"></script>
     <script>
-        (function () {
-            function renderInstagram() {
-                if (window.instgrm && window.instgrm.Embeds) {
-                    window.instgrm.Embeds.process();
-                }
+        const GAS_INSTAGRAM_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyc3X8tItR5T-yq0gx6dTk4zHZ80doa2OM2zzxBW3SV5JD79LXenjVdEFPzm0dvs2basg/exec';
+        const JSONP_CALLBACK_NAME = 'renderRyobiInstagramFeed';
+
+        function renderRyobiInstagramFeed(payload) {
+            const statusEl = document.getElementById('ig-feed-status');
+            const gridEl = document.getElementById('ig-feed-grid');
+
+            if (!payload || !payload.ok || !Array.isArray(payload.items) || payload.items.length === 0) {
+                statusEl.textContent = '最新投稿を表示できませんでした。';
+                gridEl.hidden = true;
+                return;
             }
 
-            document.addEventListener('DOMContentLoaded', function () {
-                renderInstagram();
-                setTimeout(renderInstagram, 400);
-                setTimeout(renderInstagram, 1400);
-            });
+            statusEl.hidden = true;
+            gridEl.hidden = false;
+            gridEl.innerHTML = payload.items.map(renderPostCard).join('');
+        }
 
-            window.addEventListener('load', function () {
-                renderInstagram();
-                setTimeout(renderInstagram, 600);
-            });
-        })();
+        function renderPostCard(item) {
+            const caption = escapeHtml(shortenText(item.caption || '', 90));
+            const mediaType = escapeHtml(labelForMediaType(item.mediaType));
+            const dateText = escapeHtml(formatDate(item.timestamp));
+            const permalink = escapeHtml(item.permalink || '#');
+            const imageUrl = escapeHtml(item.imageUrl || '');
+
+            return `
+                <a class="ig-post-card" href="${permalink}" target="_blank" rel="noopener noreferrer">
+                    <div class="ig-post-image-wrap">
+                        ${imageUrl ? `<img src="${imageUrl}" alt="Instagram post" class="ig-post-image">` : '<div class="ig-post-image fallback"></div>'}
+                        <span class="ig-media-badge">${mediaType}</span>
+                    </div>
+                    <div class="ig-post-body">
+                        <p class="ig-post-caption">${caption || 'Instagramで見る'}</p>
+                        <p class="ig-post-date">${dateText}</p>
+                    </div>
+                </a>
+            `;
+        }
+
+        function labelForMediaType(mediaType) {
+            switch (mediaType) {
+                case 'VIDEO':
+                    return 'VIDEO';
+                case 'CAROUSEL_ALBUM':
+                    return 'ALBUM';
+                case 'REELS':
+                    return 'REEL';
+                default:
+                    return 'POST';
+            }
+        }
+
+        function formatDate(value) {
+            if (!value) return '';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return '';
+            return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+        }
+
+        function shortenText(text, maxLength) {
+            if (text.length <= maxLength) return text;
+            return text.slice(0, maxLength).trim() + '…';
+        }
+
+        function escapeHtml(text) {
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function loadInstagramFeed() {
+            const script = document.createElement('script');
+            script.src = `${GAS_INSTAGRAM_ENDPOINT}?callback=${JSONP_CALLBACK_NAME}`;
+            script.async = true;
+            script.onerror = function () {
+                const statusEl = document.getElementById('ig-feed-status');
+                statusEl.textContent = '最新投稿の読み込みに失敗しました。';
+            };
+            document.body.appendChild(script);
+            return;
+        }
+
+        document.addEventListener('DOMContentLoaded', loadInstagramFeed);
     </script>
 </body>
 </html>
