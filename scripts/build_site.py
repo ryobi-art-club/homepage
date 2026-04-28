@@ -894,7 +894,7 @@ def main() -> None:
         (output_dir / 'sitemap.xml').write_text(sitemap_xml, encoding='utf-8')
     shutil.copy2(Path(args.static_config).parent / 'stylesheet.css', output_dir / 'stylesheet.css')
     shutil.copy2(Path(args.static_config).parent / 'site.js', output_dir / 'site.js')
-    shutil.copy2(Path(args.static_config).parent / 'logo.ong', output_dir / 'logo.png')
+    shutil.copy2(Path(args.static_config).parent / 'logo.png', output_dir / 'logo.png')
     copy_tree(assets_root, output_dir / 'assets')
     print(f'Built site at {output_dir}')
 
