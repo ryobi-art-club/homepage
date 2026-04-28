@@ -50,7 +50,7 @@ def build_seo_context(static: dict[str, Any], data: dict[str, Any]) -> dict[str,
     base_url = normalized_site_url(static.get('og_url', ''))
     site_title = '神戸大学美術部凌美会 | ホームページ'
     description = '神戸大学美術部凌美会の公式ホームページです。展示会情報、活動記録・告知、入部案内、ご依頼の方向け情報を掲載しています。'
-    og_image = static.get('og_image', 'logo.svg')
+    og_image = static.get('og_image', 'logo.png')
     image_url = og_image if str(og_image).startswith('http') else (base_url + str(og_image).lstrip('/')) if base_url else str(og_image)
     organization = {
         '@context': 'https://schema.org',
@@ -719,7 +719,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
   <nav class="global-nav">
     <div class="nav-container">
       <a href="#home" class="nav-brand">
-        <img src="logo.svg" alt="凌美会 ロゴ" class="nav-brand-logo">
+        <img src="logo.png" alt="凌美会 ロゴ" class="nav-brand-logo">
         <span class="nav-brand-text">{escape(static['club_name_jp'])}</span>
       </a>
       <ul class="nav-menu">
@@ -736,7 +736,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
 
   <header id="home" class="hero-section">
     <div class="hero-content">
-      <img src="logo.svg" alt="凌美会 ロゴ" class="hero-logo">
+      <img src="logo.png" alt="凌美会 ロゴ" class="hero-logo">
       <p class="hero-kicker">{escape(static['hero_kicker'])}</p>
       <h1 class="hero-title">{escape(static['hero_title'])}</h1>
       <p class="hero-subtitle">{escape(static['hero_subtitle'])}</p>
@@ -894,7 +894,7 @@ def main() -> None:
         (output_dir / 'sitemap.xml').write_text(sitemap_xml, encoding='utf-8')
     shutil.copy2(Path(args.static_config).parent / 'stylesheet.css', output_dir / 'stylesheet.css')
     shutil.copy2(Path(args.static_config).parent / 'site.js', output_dir / 'site.js')
-    shutil.copy2(Path(args.static_config).parent / 'logo.svg', output_dir / 'logo.svg')
+    shutil.copy2(Path(args.static_config).parent / 'logo.ong', output_dir / 'logo.png')
     copy_tree(assets_root, output_dir / 'assets')
     print(f'Built site at {output_dir}')
 
