@@ -1,0 +1,90 @@
+{
+  "club_name_jp": "神戸大学美術部凌美会",
+  "club_name_en": "Art Club Ryobi",
+  "hero_kicker": "KOBE UNIVERSITY OFFICIAL ART CLUB",
+  "hero_title": "凌美会",
+  "hero_subtitle": "神戸大学公認団体の美術部です。",
+  "og_url": "https://ryobi-art-club.github.io/homepage/",
+  "og_image": "logo.svg",
+  "intro_text": "凌美会は、1954年より神戸大学で活動する美術部です。経験者・未経験者を問わず、それぞれのペースで制作しています。年に数回ギャラリーを借りて展覧会を開催しており、阪神間5大学合同展藝縁会に加盟しています。",
+  "recruit_static": {
+    "headline": "入部を考えている方へ",
+    "summary": "活動の雰囲気や制作環境をまとめています。新歓イベントカレンダーもあわせて確認できます。入部希望の方はInstagramかXのDMまでご連絡ください。",
+    "info_points": [
+      {
+        "label": "活動場所",
+        "text": "六甲台第一キャンパス グラウンド横の部室"
+      },
+      {
+        "label": "活動頻度",
+        "text": "好きな日、好きな時間帯に来て制作できます。"
+      },
+      {
+        "label": "掛け持ち",
+        "text": "自由です。授業や他団体の活動とも両立しやすいです。"
+      },
+      {
+        "label": "部員構成",
+        "text": "幅広い学部の方がいます。国際人間科学部・工学部建築学科はやや多めです。"
+      }
+    ],
+    "materials": [
+      "油絵具",
+      "水彩",
+      "アクリル",
+      "日本画材",
+      "スプレー",
+      "鉛筆・木炭",
+      "クレパス・パステル",
+      "張り済みキャンバス",
+      "画用紙",
+      "乾燥棚",
+      "イーゼル",
+      "美術教本"
+    ],
+    "annual_schedule": [
+      {
+        "period": "4月 / 5月",
+        "label": "新歓祭・新歓イベント",
+        "accent": "yellow"
+      },
+      {
+        "period": "6月 / 7月",
+        "label": "七夕祭",
+        "accent": "green"
+      },
+      {
+        "period": "8月 / 9月",
+        "label": "夏合宿・夏展",
+        "accent": "blue"
+      },
+      {
+        "period": "10月 / 11月",
+        "label": "六甲祭",
+        "accent": "white"
+      },
+      {
+        "period": "12月 / 1月",
+        "label": "部内展（不定期）",
+        "accent": "yellow"
+      },
+      {
+        "period": "2月 / 3月",
+        "label": "春合宿・春展",
+        "accent": "green"
+      }
+    ]
+  },
+  "requests_static": {
+    "summary": "ご依頼の方は、下記連絡先までお気軽にご相談ください。過去の取り組み事例も掲載しております。",
+    "contact_email": "ryobi.welcome@gmail.com",
+    "contact_instagram": "@ryobi.welcome",
+    "contact_x": "@Art_Club_Ryobi"
+  },
+  "social_links": {
+    "instagram": "https://www.instagram.com/ryobi.welcome/",
+    "x": "https://x.com/Art_Club_Ryobi",
+    "email": "mailto:ryobi.welcome@gmail.com"
+  },
+  "copyright": "© 2026 神戸大学美術部凌美会"
+}

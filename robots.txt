@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://ryobi-art-club.github.io/homepage/sitemap.xml
