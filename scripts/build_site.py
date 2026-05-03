@@ -892,6 +892,10 @@ def main() -> None:
     sitemap_xml = render_sitemap_xml(seo['base_url'], seo['lastmod'])
     if sitemap_xml:
         (output_dir / 'sitemap.xml').write_text(sitemap_xml, encoding='utf-8')
+    verification_dir = Path(args.static_config).parent / "verification"
+    for file in verification_dir.iterdir():
+        if file.is_file():
+            shutil.copy2(file, output_dir / file.name)
     shutil.copy2(Path(args.static_config).parent / 'stylesheet.css', output_dir / 'stylesheet.css')
     shutil.copy2(Path(args.static_config).parent / 'site.js', output_dir / 'site.js')
     shutil.copy2(Path(args.static_config).parent / 'logo.png', output_dir / 'logo.png')
