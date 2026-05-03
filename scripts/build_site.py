@@ -881,7 +881,6 @@ def main() -> None:
     page_html = render_page(static, data)
     seo = build_seo_context(static, data)
     (output_dir / 'index.html').write_text(page_html, encoding='utf-8')
-    (output_dir / 'robots.txt').write_text(render_robots_txt(seo['base_url']), encoding='utf-8')
     sitemap_xml = render_sitemap_xml(seo['base_url'], seo['lastmod'])
     if sitemap_xml:
         (output_dir / 'sitemap.xml').write_text(sitemap_xml, encoding='utf-8')
