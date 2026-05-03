@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -27,14 +27,19 @@ jobs:
 
       - name: Fetch Google content snapshot
         run: |
-          python scripts/fetch_google_content.py             --service-account-json /tmp/service-account.json             --content-spreadsheet-id '${{ secrets.CONTENT_SPREADSHEET_ID }}'             --output-json build/runtime/content_snapshot.json             --assets-dir build/runtime/assets
+          python scripts/fetch_google_content.py \
+            --service-account-json /tmp/service-account.json \
+            --content-spreadsheet-id '${{ secrets.CONTENT_SPREADSHEET_ID }}' \
+            --output-json build/runtime/content_snapshot.json \
+            --assets-dir build/runtime/assets
 
       - name: Build static site
         run: |
-          python scripts/build_site.py             --static-config src/site_static.json             --content-snapshot build/runtime/content_snapshot.json             --assets-root build/runtime/assets             --output-dir dist
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
+          python scripts/build_site.py \
+            --static-config src/site_static.json \
+            --content-snapshot build/runtime/content_snapshot.json \
+            --assets-root build/runtime/assets \
+            --output-dir dist
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -52,4 +57,4 @@ jobs:
       name: github-pages
     steps:
       - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

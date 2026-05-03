@@ -92,13 +92,6 @@ def build_seo_context(static: dict[str, Any], data: dict[str, Any]) -> dict[str,
         'lastmod': lastmod,
     }
 
-
-def render_robots_txt(base_url: str) -> str:
-    if not base_url:
-        return 'User-agent: *\nAllow: /\n'
-    return f'User-agent: *\nAllow: /\nSitemap: {base_url}sitemap.xml\n'
-
-
 def render_sitemap_xml(base_url: str, lastmod: str) -> str:
     if not base_url:
         return ''
