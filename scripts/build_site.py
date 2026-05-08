@@ -7,7 +7,7 @@ import json
 import re
 import shutil
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -80,7 +80,7 @@ def build_seo_context(static: dict[str, Any], data: dict[str, Any]) -> dict[str,
         except Exception:
             continue
     if not lastmod:
-        lastmod = datetime.utcnow().date().isoformat()
+        lastmod = datetime.now(timezone.utc).date().isoformat()
     return {
         'base_url': base_url,
         'title': site_title,
@@ -429,19 +429,20 @@ def render_exhibition_upcoming(items: list[dict[str, Any]]) -> str:
             </div>
             """
         overview = upcoming.get('overview') or upcoming.get('theme', '')
+        poster = render_dm_carousel(upcoming, upcoming.get('title', '展示会DM'))
         cards.append(f"""
         <article class="simple-card glass-card exhibition-card upcoming-card">
           <div class="exhibition-heading">
             <div class="exhibition-kicker">{'NEXT EXHIBITION' if index == 0 else 'UPCOMING'}</div>
             <h4 class="exhibition-title">{escape(upcoming.get('title', ''))}</h4>
           </div>
-          <div class="exhibition-hero">
+          <div class="exhibition-hero{' no-poster' if not poster else ''}">
             <div class="exhibition-body">
               <p class="exhibition-overview">{nl2br(overview)}</p>
               {render_exhibition_meta(upcoming, include_address=True)}
               {map_embed}
             </div>
-            {render_dm_carousel(upcoming, upcoming.get('title', '展示会DM'))}
+            {poster}
           </div>
         </article>
         """)
@@ -626,22 +627,30 @@ def render_exhibition_recent(recent: dict[str, Any] | None) -> str:
     gallery_id = 'recent-works-' + re.sub(r'[^a-zA-Z0-9_-]+', '-', str(recent.get('id', 'recent'))).strip('-')
     work_gallery = render_work_gallery(works, gallery_id)
     overview = recent.get('overview') or recent.get('theme', '')
+    poster = render_dm_carousel(recent, recent.get('title', '展示会DM'))
     return f"""
     <article class="simple-card glass-card exhibition-card recent-card">
       <div class="exhibition-heading">
         <div class="exhibition-kicker">RECENT EXHIBITION</div>
         <h4 class="exhibition-title">{escape(recent.get('title', ''))}</h4>
       </div>
-      <div class="exhibition-hero">
+      <div class="exhibition-hero{' no-poster' if not poster else ''}">
         <div class="exhibition-body">
           <p class="exhibition-overview">{nl2br(overview)}</p>
           {render_exhibition_meta(recent, include_address=True)}
         </div>
-        {render_dm_carousel(recent, recent.get('title', '展示会DM'))}
+        {poster}
       </div>
       {work_gallery}
     </article>
     """
+
+
+def render_recruit_calendar(calendar: dict[str, Any]) -> str:
+    images = calendar.get('images', []) if calendar else []
+    if not images:
+        return '<div class="empty-message">現在公開中の新歓イベントカレンダー画像はありません。</div>'
+    return render_carousel(images, '新歓イベントカレンダー', extra_class='recruit-carousel')
 
 def render_exhibition_archive(items: list[dict[str, Any]]) -> str:
     if not items:
@@ -815,7 +824,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
           <div class="simple-card glass-card">
             <p class="eyebrow">WELCOME CALENDAR</p>
             <h4 style="font-size:1.28rem;">{escape(data.get('recruit_calendar', {}).get('label', '新歓イベントカレンダー'))}</h4>
-            {render_carousel(data.get('recruit_calendar', {}).get('images', []), '新歓イベントカレンダー', extra_class='recruit-carousel')}
+            {render_recruit_calendar(data.get('recruit_calendar', {}))}
           </div>
         </section>
 

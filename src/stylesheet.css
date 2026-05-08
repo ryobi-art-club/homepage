@@ -528,6 +528,10 @@ a { color: inherit; }
 .archive-hero.no-poster {
   grid-template-columns: 1fr;
 }
+.exhibition-hero.no-poster,
+.upcoming-card .exhibition-hero.no-poster {
+  grid-template-columns: 1fr !important;
+}
 .archive-poster {
   width: 100%;
   max-width: 280px;
