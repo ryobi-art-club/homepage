@@ -5,7 +5,6 @@ import argparse
 import json
 import mimetypes
 import os
-import re
 import shutil
 import tempfile
 from datetime import datetime, timezone
@@ -21,10 +20,10 @@ SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets.readonly',
 ]
 SHEETS_RANGE_MAP = {
+    'Recruit': 'Recruit!A1:Z2000',
     'PublishControl': 'PublishControl!A1:Z200',
     'ActivityArticles': 'ActivityArticles!A1:Z2000',
     'Exhibitions': 'Exhibitions!A1:Z2000',
-    'ExhibitionWorks': 'ExhibitionWorks!A1:Z5000',
     'RequestCases': 'RequestCases!A1:Z2000',
     'ChangeLog': 'ChangeLog!A1:Z2000',
 }
@@ -46,13 +45,16 @@ def build_clients(service_account_json: str):
 
 
 def get_sheet_rows(sheets, spreadsheet_id: str, range_name: str) -> list[dict[str, str]]:
-    values = (
-        sheets.spreadsheets()
-        .values()
-        .get(spreadsheetId=spreadsheet_id, range=range_name)
-        .execute()
-        .get('values', [])
-    )
+    try:
+        values = (
+            sheets.spreadsheets()
+            .values()
+            .get(spreadsheetId=spreadsheet_id, range=range_name)
+            .execute()
+            .get('values', [])
+        )
+    except Exception:
+        return []
     if not values:
         return []
     headers = values[0]
@@ -81,6 +83,15 @@ def parse_bool(value: str) -> bool:
     return str(value).strip().lower() in {'1', 'true', 'yes', 'on', 'y'}
 
 
+def parse_json_cell(value: str, fallback: Any) -> Any:
+    if not value:
+        return fallback
+    try:
+        return json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        return fallback
+
+
 def file_extension_from_name(name: str, mime_type: str) -> str:
     if '.' in name:
         return '.' + name.rsplit('.', 1)[1].lower()
@@ -96,6 +107,23 @@ def download_file(drive, file_id: str, destination: Path) -> None:
         done = False
         while not done:
             _, done = downloader.next_chunk()
+
+
+def get_file_meta(drive, file_id: str) -> dict[str, Any] | None:
+    if not file_id:
+        return None
+    try:
+        return (
+            drive.files()
+            .get(
+                fileId=file_id,
+                fields='id, name, mimeType, webViewLink',
+                supportsAllDrives=True,
+            )
+            .execute()
+        )
+    except Exception:
+        return None
 
 
 def list_folder_files(drive, folder_id: str) -> list[dict[str, Any]]:
@@ -134,6 +162,28 @@ def download_folder_images(drive, folder_id: str, output_root: Path, logical_gro
     return copied_paths
 
 
+def download_ordered_images_by_ids(
+    drive,
+    file_ids: list[str],
+    output_root: Path,
+    logical_group: str,
+    max_images: int | None = None,
+) -> list[str]:
+    copied_paths = []
+    ids = [str(file_id).strip() for file_id in file_ids if str(file_id).strip()]
+    if max_images is not None:
+        ids = ids[:max_images]
+    for index, file_id in enumerate(ids, start=1):
+        file_meta = get_file_meta(drive, file_id)
+        if not file_meta or not file_meta.get('mimeType', '').startswith('image/'):
+            continue
+        ext = file_extension_from_name(file_meta.get('name', ''), file_meta.get('mimeType', ''))
+        target = output_root / logical_group / f'{index:02d}-{safe_slug(Path(file_meta.get("name", "image")).stem)}{ext}'
+        download_file(drive, file_id, target)
+        copied_paths.append(str(target.relative_to(output_root.parent)).replace(os.sep, '/'))
+    return copied_paths
+
+
 def normalize_change_log(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     items = []
     for row in rows:
@@ -151,7 +201,10 @@ def normalize_activity_articles(rows: list[dict[str, str]], drive, assets_root: 
         if not row.get('title'):
             continue
         article_id = row.get('article_id') or safe_slug(row.get('title', 'article'))
-        images = download_folder_images(drive, row.get('photo_folder_id', ''), assets_root, f'activities/{article_id}', max_images=10)
+        file_ids = parse_json_cell(row.get('media_file_ids', ''), [])
+        images = download_ordered_images_by_ids(drive, file_ids, assets_root, f'activities/{article_id}', max_images=10)
+        if not images:
+            images = download_folder_images(drive, row.get('media_folder_id') or row.get('photo_folder_id', ''), assets_root, f'activities/{article_id}', max_images=10)
         items.append({
             'id': article_id,
             'title': row.get('title', ''),
@@ -171,7 +224,10 @@ def normalize_requests(rows: list[dict[str, str]], drive, assets_root: Path) -> 
         if not row.get('title'):
             continue
         case_id = row.get('case_id') or safe_slug(row.get('title', 'case'))
-        images = download_folder_images(drive, row.get('photo_folder_id', ''), assets_root, f'requests/{case_id}', max_images=10)
+        file_ids = parse_json_cell(row.get('media_file_ids', ''), [])
+        images = download_ordered_images_by_ids(drive, file_ids, assets_root, f'requests/{case_id}', max_images=10)
+        if not images:
+            images = download_folder_images(drive, row.get('media_folder_id') or row.get('photo_folder_id', ''), assets_root, f'requests/{case_id}', max_images=10)
         items.append({
             'id': case_id,
             'title': row.get('title', ''),
@@ -182,22 +238,22 @@ def normalize_requests(rows: list[dict[str, str]], drive, assets_root: Path) -> 
     return sorted(items, key=lambda x: x['sort_order'])
 
 
-def normalize_recruit_calendar(publish_control_rows: list[dict[str, str]], drive, assets_root: Path) -> dict[str, Any]:
-    row = publish_control_rows[0] if publish_control_rows else {}
+def normalize_recruit_calendar(recruit_rows: list[dict[str, str]], drive, assets_root: Path) -> dict[str, Any]:
+    row = next((item for item in recruit_rows if parse_bool(item.get('published', ''))), recruit_rows[0] if recruit_rows else {})
+    year = str(row.get('year', '')).strip()
+    label = f'{year}年度 新歓イベントカレンダー' if year else '新歓イベントカレンダー'
+    file_ids = parse_json_cell(row.get('media_file_ids', ''), [])
+    images = download_ordered_images_by_ids(drive, file_ids, assets_root, 'recruit', max_images=3)
+    if not images:
+        images = download_folder_images(drive, row.get('media_folder_id') or row.get('recruit_calendar_folder_id', ''), assets_root, 'recruit', max_images=3)
     return {
-        'label': row.get('recruit_calendar_label', '新歓イベントカレンダー'),
-        'images': download_folder_images(drive, row.get('recruit_calendar_folder_id', ''), assets_root, 'recruit', max_images=10),
+        'label': label,
+        'year': year,
+        'images': images,
     }
 
 
-def normalize_exhibitions(ex_rows: list[dict[str, str]], work_rows: list[dict[str, str]], drive, assets_root: Path) -> dict[str, Any]:
-    work_map: dict[str, list[dict[str, str]]] = {}
-    for row in work_rows:
-        ex_id = row.get('exhibition_id')
-        if not ex_id:
-            continue
-        work_map.setdefault(ex_id, []).append(row)
-
+def normalize_exhibitions(ex_rows: list[dict[str, str]], drive, assets_root: Path) -> dict[str, Any]:
     upcoming = []
     archive = []
 
@@ -206,13 +262,9 @@ def normalize_exhibitions(ex_rows: list[dict[str, str]], work_rows: list[dict[st
 
     for row in published_rows:
         ex_id = row.get('exhibition_id') or safe_slug(row.get('title', 'exhibition'))
-        folder_id = row.get('drive_folder_id', '')
-        files = list_folder_files(drive, folder_id) if folder_id else []
-        dm_candidates = [
-            f for f in files
-            if f.get('mimeType', '').startswith('image/')
-            and re.match(r'^dm(?:[0-9０-９]+)?$', Path(f.get('name', '')).stem.lower())
-        ][:2]
+        folder_id = row.get('media_folder_id') or row.get('drive_folder_id', '')
+        dm_candidates = [get_file_meta(drive, file_id) for file_id in parse_json_cell(row.get('dm_file_ids', ''), [])[:2]]
+        dm_candidates = [file for file in dm_candidates if file and file.get('mimeType', '').startswith('image/')]
         dm_images = []
         for dm_index, dm_file in enumerate(dm_candidates, start=1):
             dm_ext = file_extension_from_name(dm_file.get('name', ''), dm_file.get('mimeType', ''))
@@ -222,20 +274,19 @@ def normalize_exhibitions(ex_rows: list[dict[str, str]], work_rows: list[dict[st
         dm_image = dm_images[0] if dm_images else ''
 
         works = []
-        work_rows_for_ex = sorted(work_map.get(ex_id, []), key=lambda x: int(x.get('sort_order') or 9999))[:200]
-        file_lookup = {f.get('name'): f for f in files}
-        for work_row in work_rows_for_ex:
-            file_name = work_row.get('image_file_name', '')
-            file_meta = file_lookup.get(file_name)
-            if not file_meta:
+        work_rows_for_ex = sorted(parse_json_cell(row.get('work_files', ''), []), key=lambda x: int(x.get('sort_order') or x.get('sortOrder') or 9999))[:200]
+        for work_index, work_row in enumerate(work_rows_for_ex, start=1):
+            file_id = str(work_row.get('file_id') or work_row.get('fileId') or '').strip()
+            file_meta = get_file_meta(drive, file_id)
+            if not file_meta or not file_meta.get('mimeType', '').startswith('image/'):
                 continue
-            ext = file_extension_from_name(file_name, file_meta.get('mimeType', ''))
-            image_target = assets_root / 'exhibitions' / ex_id / f"{safe_slug(Path(file_name).stem)}{ext}"
+            ext = file_extension_from_name(file_meta.get('name', ''), file_meta.get('mimeType', ''))
+            image_target = assets_root / 'exhibitions' / ex_id / f"{work_index:03d}-{safe_slug(Path(file_meta.get('name', 'work')).stem)}{ext}"
             download_file(drive, file_meta['id'], image_target)
             works.append({
                 'image': str(image_target.relative_to(assets_root.parent)).replace(os.sep, '/'),
-                'title': work_row.get('work_title', ''),
-                'artist': work_row.get('artist_name', ''),
+                'title': work_row.get('title') or work_row.get('workTitle', ''),
+                'artist': work_row.get('artist') or work_row.get('artistName', ''),
             })
 
         payload = {
@@ -286,10 +337,10 @@ def main() -> None:
     tables = {name: get_sheet_rows(sheets, spreadsheet_id, range_name) for name, range_name in SHEETS_RANGE_MAP.items()}
     snapshot = {
         'meta': {'generated_at': now_iso()},
-        'recruit_calendar': normalize_recruit_calendar(tables['PublishControl'], drive, assets_dir),
+        'recruit_calendar': normalize_recruit_calendar(tables['Recruit'] or tables['PublishControl'], drive, assets_dir),
         'activities': normalize_activity_articles(tables['ActivityArticles'], drive, assets_dir),
         'requests': normalize_requests(tables['RequestCases'], drive, assets_dir),
-        'exhibitions': normalize_exhibitions(tables['Exhibitions'], tables['ExhibitionWorks'], drive, assets_dir),
+        'exhibitions': normalize_exhibitions(tables['Exhibitions'], drive, assets_dir),
         'change_log': normalize_change_log(tables['ChangeLog']),
     }
     output_json.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding='utf-8')
