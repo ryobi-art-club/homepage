@@ -2769,6 +2769,24 @@ footer {
   max-width: 100% !important;
 }
 
+/* On phones, exhibition works follow the curator-defined display order. */
+@media (max-width: 768px) {
+  .work-gallery.work-gallery-balanced {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 18px !important;
+    overflow: visible !important;
+  }
+  .work-gallery.work-gallery-balanced .work-full,
+  .work-gallery.work-gallery-balanced .work-columns,
+  .work-gallery.work-gallery-balanced .work-column {
+    display: contents !important;
+  }
+  .work-gallery.work-gallery-balanced .work-card {
+    order: var(--work-order, 0) !important;
+  }
+}
+
 
 /* rev29 targeted: one-image aspect behavior */
 @media (min-width: 769px) {

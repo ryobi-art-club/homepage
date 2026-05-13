@@ -553,7 +553,7 @@ def render_work_card(index: int, work: dict[str, Any], ratio: float, extra_class
     caption = (work.get('title', '作品画像') or '') + ((' / ' + work.get('artist', '')) if work.get('artist') else '')
     classes = 'work-card' + (f' {extra_class}' if extra_class else '')
     return f'''
-      <article class="{classes}" data-work-card data-aspect="{ratio:.4f}">
+      <article class="{classes}" data-work-card data-aspect="{ratio:.4f}" style="--work-order: {index};">
         <button class="work-image-button" type="button" data-lightbox-gallery="{escape(work.get('_gallery_id', 'recent-works'))}" data-lightbox-index="{index}" data-lightbox-caption="{escape(caption)}" aria-label="{escape(work.get('title', '作品画像'))}を拡大">
           <img src="{escape(work.get('image', ''))}" alt="{escape(work.get('title', '作品画像'))}" loading="lazy">
         </button>
