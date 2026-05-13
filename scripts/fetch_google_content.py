@@ -292,6 +292,7 @@ def normalize_exhibitions(ex_rows: list[dict[str, str]], drive, assets_root: Pat
         payload = {
             'id': ex_id,
             'title': row.get('title', ''),
+            'subtitle': row.get('subtitle', ''),
             'theme': row.get('theme', ''),
             'overview': row.get('overview', '') or row.get('summary', ''),
             'venue_name': row.get('venue_name', ''),

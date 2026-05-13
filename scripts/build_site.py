@@ -425,6 +425,12 @@ def render_exhibition_meta(item: dict[str, Any], include_address: bool = True) -
     """
 
 
+def render_exhibition_subtitle(item: dict[str, Any]) -> str:
+    subtitle = str(item.get('subtitle', '') or '').strip()
+    if not subtitle:
+        return ''
+    return f'<div class="exhibition-subtitle">{escape(subtitle)}</div>'
+
 
 def render_exhibition_upcoming(items: list[dict[str, Any]]) -> str:
     if not items:
@@ -444,6 +450,7 @@ def render_exhibition_upcoming(items: list[dict[str, Any]]) -> str:
         <article class="simple-card glass-card exhibition-card upcoming-card">
           <div class="exhibition-heading">
             <div class="exhibition-kicker">{'NEXT EXHIBITION' if index == 0 else 'UPCOMING'}</div>
+            {render_exhibition_subtitle(upcoming)}
             <h4 class="exhibition-title">{escape(upcoming.get('title', ''))}</h4>
           </div>
           <div class="exhibition-hero{' no-poster' if not poster else ''}">
@@ -642,6 +649,7 @@ def render_exhibition_recent(recent: dict[str, Any] | None) -> str:
     <article class="simple-card glass-card exhibition-card recent-card">
       <div class="exhibition-heading">
         <div class="exhibition-kicker">RECENT EXHIBITION</div>
+        {render_exhibition_subtitle(recent)}
         <h4 class="exhibition-title">{escape(recent.get('title', ''))}</h4>
       </div>
       <div class="exhibition-hero{' no-poster' if not poster else ''}">
@@ -675,6 +683,7 @@ def render_exhibition_archive(items: list[dict[str, Any]]) -> str:
               <div class="exhibition-hero archive-hero{' no-poster' if not poster else ''}">
                 <div class="exhibition-body">
                   <div class="exhibition-kicker">ARCHIVE</div>
+                  {render_exhibition_subtitle(item)}
                   <h4 class="exhibition-title archive-title">{escape(item.get('title', ''))}</h4>
                   <p class="exhibition-overview archive-overview">{nl2br(overview)}</p>
                   {render_exhibition_meta(item, include_address=True)}

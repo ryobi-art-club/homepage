@@ -447,6 +447,13 @@ a { color: inherit; }
   line-height: 1.28;
   margin-bottom: 14px;
 }
+.exhibition-subtitle {
+  color: rgba(255,255,255,0.78);
+  font-size: clamp(0.9rem, 1.4vw, 1.08rem);
+  font-weight: 700;
+  line-height: 1.45;
+  margin: -2px 0 6px;
+}
 .exhibition-theme { color: rgba(255,255,255,0.86); margin-bottom: 18px; font-size: 1.02rem; }
 .exhibition-meta {
   display: grid;
