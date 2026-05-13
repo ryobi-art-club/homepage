@@ -401,16 +401,26 @@ def render_exhibition_meta(item: dict[str, Any], include_address: bool = True) -
     if item.get('time_line'):
         date_time_parts.append(f'<span class="venue-address">{escape(item.get("time_line", ""))}</span>')
     date_time_html = ''.join(date_time_parts)
+    rows = []
+    if date_time_html:
+        rows.append(
+            '<div class="exhibition-meta-row">'
+            '<div class="exhibition-meta-label">会期</div>'
+            f'<div class="exhibition-meta-value venue-stack">{date_time_html}</div>'
+            '</div>'
+        )
+    if venue_html:
+        rows.append(
+            '<div class="exhibition-meta-row">'
+            '<div class="exhibition-meta-label">会場</div>'
+            f'<div class="exhibition-meta-value venue-stack">{venue_html}</div>'
+            '</div>'
+        )
+    if not rows:
+        return ''
     return f"""
     <div class="exhibition-meta compact-meta">
-      <div class="exhibition-meta-row">
-        <div class="exhibition-meta-label">会期</div>
-        <div class="exhibition-meta-value venue-stack">{date_time_html}</div>
-      </div>
-      <div class="exhibition-meta-row">
-        <div class="exhibition-meta-label">会場</div>
-        <div class="exhibition-meta-value venue-stack">{venue_html}</div>
-      </div>
+      {''.join(rows)}
     </div>
     """
 
