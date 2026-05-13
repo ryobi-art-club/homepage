@@ -428,7 +428,7 @@ def render_exhibition_meta(item: dict[str, Any], include_address: bool = True) -
 
 def render_exhibition_upcoming(items: list[dict[str, Any]]) -> str:
     if not items:
-        return '<div class="empty-message">現在ご案内できる展示会はありません。</div>'
+        return ''
     cards = []
     for index, upcoming in enumerate(items):
         map_embed = ''
