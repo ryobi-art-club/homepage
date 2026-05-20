@@ -529,6 +529,7 @@ a { color: inherit; }
 .work-title { font-weight: 700; }
 .work-artist { color: var(--text-muted); font-size: 0.95rem; }
 .archive-list { display: grid; gap: 18px; margin-top: 12px; }
+.archive-mobile-heading { display: none; }
 .archive-hero {
   grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
 }
@@ -2774,6 +2775,24 @@ footer {
 .work-card img {
   min-width: 0 !important;
   max-width: 100% !important;
+}
+
+@media (max-width: 768px) {
+  .archive-mobile-heading {
+    display: block !important;
+    margin-bottom: 16px !important;
+  }
+  .archive-card .archive-desktop-heading {
+    display: none !important;
+  }
+  .archive-hero .dm-poster-wrap {
+    order: 1 !important;
+    justify-self: center !important;
+    margin: 0 auto 18px !important;
+  }
+  .archive-hero .exhibition-body {
+    order: 2 !important;
+  }
 }
 
 /* On phones, exhibition works follow the curator-defined display order. */

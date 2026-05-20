@@ -7,6 +7,13 @@
   "og_url": "https://ryobi-art-club.github.io/homepage/",
   "og_image": "logo.png",
   "intro_text": "凌美会は、1954年より神戸大学で活動する美術部です。経験者・未経験者を問わず、それぞれのペースで制作しています。年に数回ギャラリーを借りて展覧会を開催しており、阪神間5大学合同展藝縁会に加盟しています。",
+  "information_text": "展示会、活動記録・告知、入部、ご依頼に関する情報をまとめています。",
+  "exhibitions_static": {
+    "summary": "開催予定の展示会と最近の展示記録を掲載しています。"
+  },
+  "activities_static": {
+    "summary": "展示以外の活動やイベントの記録です。"
+  },
   "recruit_static": {
     "headline": "入部を考えている方へ",
     "summary": "活動の雰囲気や制作環境をまとめています。新歓イベントカレンダーもあわせて確認できます。入部希望の方はInstagramかXのDMまでご連絡ください。",

@@ -199,10 +199,35 @@ dist/
 | `og_url` | サイトの正規 URL（OGP・canonical・sitemap に使用）|
 | `og_image` | OGP 画像のパス（`logo.png` または絶対 URL）|
 | `intro_text` | About セクションの紹介文 |
+| `information_text` | INFO セクション全体のリード文 |
+| `exhibitions_static` | 展示会タブの固定コンテンツ（後述）|
+| `activities_static` | 活動記録・告知タブの固定コンテンツ（後述）|
 | `recruit_static` | 入部希望ページの固定コンテンツ（後述）|
 | `requests_static` | ご依頼ページの固定コンテンツ（後述）|
 | `social_links` | Instagram / X / Email のリンク |
 | `copyright` | フッターのコピーライト文字列 |
+
+**固定文内リンク：**
+
+本文系の固定文では、次の形式でリンクを埋め込めます。
+
+```text
+[表示テキスト](https://example.com)
+```
+
+対象は `hero_subtitle`, `intro_text`, `information_text`, `exhibitions_static.summary`, `activities_static.summary`, `recruit_static.summary`, `recruit_static.info_points[].text`, `requests_static.summary` です。タイトル、SEO メタ情報、OGP、alt、SNS URL、メールアドレスには適用しません。
+
+**`exhibitions_static` の詳細：**
+
+| フィールド | 説明 |
+|-----------|------|
+| `summary` | 展示会タブのリード文 |
+
+**`activities_static` の詳細：**
+
+| フィールド | 説明 |
+|-----------|------|
+| `summary` | 活動記録・告知タブのリード文 |
 
 **`recruit_static` の詳細：**
 

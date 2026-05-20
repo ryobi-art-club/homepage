@@ -27,8 +27,30 @@ def escape(value: Any) -> str:
     return html.escape('' if value is None else str(value), quote=True)
 
 
+LINK_RE = re.compile(r'\[([^\]\n]+)\]\((https?://[^\s)]+)\)')
+
+
+def render_inline_rich_text(value: Any) -> str:
+    text = '' if value is None else str(value)
+    parts: list[str] = []
+    last = 0
+    for match in LINK_RE.finditer(text):
+        parts.append(escape(text[last:match.start()]))
+        label = escape(match.group(1))
+        url = escape(match.group(2))
+        parts.append(f'<a href="{url}" target="_blank" rel="noopener noreferrer">{label}</a>')
+        last = match.end()
+    parts.append(escape(text[last:]))
+    return ''.join(parts)
+
+
+def rich_text(value: Any) -> str:
+    text = '' if value is None else str(value)
+    return '<br>'.join(render_inline_rich_text(line) for line in text.splitlines())
+
+
 def nl2br(value: str) -> str:
-    return '<br>'.join(escape(value).splitlines())
+    return rich_text(value)
 
 
 def fmt_date(ts: str) -> str:
@@ -342,7 +364,7 @@ def render_info_points(points: list[dict[str, str]]) -> str:
         f"""
         <article class="info-point">
           <div class="info-point-label">{escape(point.get('label', ''))}</div>
-          <div class="info-point-text">{escape(point.get('text', ''))}</div>
+          <div class="info-point-text">{rich_text(point.get('text', ''))}</div>
         </article>
         """
         for point in points
@@ -680,11 +702,18 @@ def render_exhibition_archive(items: list[dict[str, Any]]) -> str:
         cards.append(
             f"""
             <article class="simple-card glass-card exhibition-card archive-card">
+              <div class="archive-mobile-heading">
+                <div class="exhibition-kicker">ARCHIVE</div>
+                {render_exhibition_subtitle(item)}
+                <h4 class="exhibition-title archive-title">{escape(item.get('title', ''))}</h4>
+              </div>
               <div class="exhibition-hero archive-hero{' no-poster' if not poster else ''}">
                 <div class="exhibition-body">
-                  <div class="exhibition-kicker">ARCHIVE</div>
-                  {render_exhibition_subtitle(item)}
-                  <h4 class="exhibition-title archive-title">{escape(item.get('title', ''))}</h4>
+                  <div class="archive-desktop-heading">
+                    <div class="exhibition-kicker">ARCHIVE</div>
+                    {render_exhibition_subtitle(item)}
+                    <h4 class="exhibition-title archive-title">{escape(item.get('title', ''))}</h4>
+                  </div>
                   <p class="exhibition-overview archive-overview">{nl2br(overview)}</p>
                   {render_exhibition_meta(item, include_address=True)}
                   {'<div class="archive-actions"><a class="archive-link" href="' + escape(item.get('folder_url', '')) + '" target="_blank" rel="noopener noreferrer">Google Driveで見る <i class="fa-solid fa-up-right-from-square"></i></a></div>' if item.get('folder_url') else ''}
@@ -697,6 +726,8 @@ def render_exhibition_archive(items: list[dict[str, Any]]) -> str:
     return f'<div class="archive-list">{"".join(cards)}</div>'
 
 def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
+    exhibitions_static = static.get('exhibitions_static', {})
+    activities_static = static.get('activities_static', {})
     recruit = static['recruit_static']
     requests_static = static['requests_static']
     seo = build_seo_context(static, data)
@@ -760,7 +791,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
       <img src="logo.png" alt="凌美会 ロゴ" class="hero-logo">
       <p class="hero-kicker">{escape(static['hero_kicker'])}</p>
       <h1 class="hero-title">{escape(static['hero_title'])}</h1>
-      <p class="hero-subtitle">{escape(static['hero_subtitle'])}</p>
+      <p class="hero-subtitle">{rich_text(static['hero_subtitle'])}</p>
     </div>
     <div class="decoration circle-green"></div>
     <div class="decoration square-blue"></div>
@@ -772,7 +803,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
       <div class="section-header">
         <p class="section-label">ABOUT US</p>
         <h2 class="section-title">基本情報</h2>
-        <p class="section-subtitle">{escape(static['intro_text'])}</p>
+        <p class="section-subtitle">{rich_text(static['intro_text'])}</p>
       </div>
       <article class="simple-card glass-card">
         <p class="eyebrow">UPDATE LOG</p>
@@ -784,7 +815,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
       <div class="section-header">
         <p class="section-label">INFORMATION</p>
         <h2 class="section-title">ご案内</h2>
-        <p class="section-subtitle">展示会、活動記録・告知、入部、ご依頼に関する情報をまとめています。</p>
+        <p class="section-subtitle">{rich_text(static.get('information_text', '展示会、活動記録・告知、入部、ご依頼に関する情報をまとめています。'))}</p>
       </div>
 
       <div class="glass-card tab-shell" data-tab-shell>
@@ -799,7 +830,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
           <div class="section-header">
             <p class="eyebrow">EXHIBITIONS</p>
             <h3 class="section-title" style="font-size: clamp(1.6rem, 3vw, 2.3rem);">展示会情報</h3>
-            <p class="section-subtitle">開催予定の展示会と最近の展示記録を掲載しています。</p>
+            <p class="section-subtitle">{rich_text(exhibitions_static.get('summary', '開催予定の展示会と最近の展示記録を掲載しています。'))}</p>
           </div>
           <div class="exhibition-stack">
             {render_exhibition_upcoming(upcoming_items)}
@@ -816,7 +847,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
           <div class="section-header">
             <p class="eyebrow">ACTIVITIES</p>
             <h3 class="section-title" style="font-size: clamp(1.6rem, 3vw, 2.3rem);">活動記録・告知</h3>
-            <p class="section-subtitle">展示以外の活動やイベントの記録です。</p>
+            <p class="section-subtitle">{rich_text(activities_static.get('summary', '展示以外の活動やイベントの記録です。'))}</p>
           </div>
           {render_activity_cards(data.get('activities', []))}
         </section>
@@ -825,7 +856,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
           <div class="section-header">
             <p class="eyebrow">JOIN US</p>
             <h3 class="section-title" style="font-size: clamp(1.6rem, 3vw, 2.3rem);">入部希望の方へ</h3>
-            <p class="section-subtitle">{escape(recruit['summary'])}</p>
+            <p class="section-subtitle">{rich_text(recruit['summary'])}</p>
           </div>
           <div class="info-grid">{render_info_points(recruit['info_points'])}</div>
           <div class="simple-card glass-card">
@@ -851,7 +882,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
           <div class="section-header">
             <p class="eyebrow">REQUESTS</p>
             <h3 class="section-title" style="font-size: clamp(1.6rem, 3vw, 2.3rem);">ご依頼の方へ</h3>
-            <p class="section-subtitle">{escape(requests_static['summary'])}</p>
+            <p class="section-subtitle">{rich_text(requests_static['summary'])}</p>
           </div>
           <div class="simple-card glass-card request-contact-card" style="margin-bottom: 18px;">
             <p class="request-contact-heading">お問い合わせ先</p>
