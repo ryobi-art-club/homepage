@@ -9,33 +9,47 @@
     openTrigger: function() {}
   };
 
-  function initNav() {
-    var nav = document.querySelector('.global-nav');
-    var toggle = nav && nav.querySelector('.nav-toggle');
-    if (!nav || !toggle) return;
-    function setOpen(open) {
-      nav.classList.toggle('is-menu-open', open);
-      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    }
-    toggle.addEventListener('click', function() {
-      setOpen(!nav.classList.contains('is-menu-open'));
+  function initReveals() {
+    if (!('IntersectionObserver' in window)) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var targets = Array.from(document.querySelectorAll(
+      '.section-header, .simple-card, .tab-shell, .article-card, .request-card, .info-point, .timeline-item, .work-card'
+    ));
+    targets.forEach(function(el) {
+      el.classList.add('reveal');
+      var index = 0;
+      var sibling = el;
+      while ((sibling = sibling.previousElementSibling)) {
+        if (sibling.classList.contains('reveal')) index++;
+      }
+      el.style.transitionDelay = Math.min(index, 7) * 70 + 'ms';
     });
-    document.addEventListener('click', function(event) {
-      if (!nav.classList.contains('is-menu-open')) return;
-      if (!nav.contains(event.target)) setOpen(false);
-    });
-    document.addEventListener('keydown', function(event) {
-      if (event.key === 'Escape') setOpen(false);
-    });
-    nav.querySelectorAll('.nav-menu a').forEach(function(link) {
-      link.addEventListener('click', function() {
-        setOpen(false);
-        var tab = link.getAttribute('data-tab-jump');
-        if (!tab) return;
-        var button = document.querySelector('[data-tab-target="' + cssEscape(tab) + '"]');
-        if (button) button.click();
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (!entry.isIntersecting) return;
+        var el = entry.target;
+        el.classList.add('is-visible');
+        observer.unobserve(el);
+        // 出現後は reveal を外す。inline の transition-delay を残すと
+        // ホバー演出まで巻き添えで遅延するため。
+        el.addEventListener('transitionend', function handle(event) {
+          if (event.target !== el) return;
+          el.removeEventListener('transitionend', handle);
+          el.classList.remove('reveal', 'is-visible');
+          el.style.transitionDelay = '';
+        });
       });
-    });
+    }, { threshold: 0.05, rootMargin: '0px 0px -36px' });
+    targets.forEach(function(el) { observer.observe(el); });
+    // 保険: 初期表示でIntersectionObserverが発火しない環境でも、
+    // 画面内の要素は一定時間後に必ず表示する。
+    window.setTimeout(function() {
+      targets.forEach(function(el) {
+        if (!el.classList.contains('reveal') || el.classList.contains('is-visible')) return;
+        var rect = el.getBoundingClientRect();
+        if (rect.top < window.innerHeight && rect.bottom > 0) el.classList.add('is-visible');
+      });
+    }, 1500);
   }
 
   function initTabs() {
@@ -286,7 +300,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', function() {
-    initNav();
+    initReveals();
     initTabs();
     initLightbox();
     initCarousels();
