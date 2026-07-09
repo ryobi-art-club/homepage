@@ -774,15 +774,27 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
         <img src="logo.png" alt="凌美会 ロゴ" class="nav-brand-logo">
         <span class="nav-brand-text">{escape(static['club_name_jp'])}</span>
       </a>
-      <ul class="nav-menu">
+      <ul class="nav-menu" id="global-nav-menu">
         <li><a href="#about">ABOUT</a></li>
         <li><a href="#info-tabs">INFO</a></li>
+        <li class="nav-menu-tab"><a href="#info-tabs" data-tab-jump="exhibitions">展覧会</a></li>
+        <li class="nav-menu-tab"><a href="#info-tabs" data-tab-jump="activities">活動記録・告知</a></li>
+        <li class="nav-menu-tab"><a href="#info-tabs" data-tab-jump="recruit">入部希望の方</a></li>
+        <li class="nav-menu-tab"><a href="#info-tabs" data-tab-jump="requests">ご依頼の方</a></li>
+        <li class="nav-menu-social">
+          <a href="{escape(static['social_links']['instagram'])}" target="_blank" rel="noopener noreferrer" class="social-link instagram" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+          <a href="{escape(static['social_links']['x'])}" target="_blank" rel="noopener noreferrer" class="social-link x-twitter" aria-label="X (Twitter)"><i class="fa-brands fa-x-twitter"></i></a>
+          <a href="{escape(static['social_links']['email'])}" class="social-link email" aria-label="Email"><i class="fa-regular fa-envelope"></i></a>
+        </li>
       </ul>
       <ul class="nav-links">
         <li><a href="{escape(static['social_links']['instagram'])}" target="_blank" rel="noopener noreferrer" class="social-link instagram" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a></li>
         <li><a href="{escape(static['social_links']['x'])}" target="_blank" rel="noopener noreferrer" class="social-link x-twitter" aria-label="X (Twitter)"><i class="fa-brands fa-x-twitter"></i></a></li>
         <li><a href="{escape(static['social_links']['email'])}" class="social-link email" aria-label="Email"><i class="fa-regular fa-envelope"></i></a></li>
       </ul>
+      <button class="nav-toggle" type="button" aria-label="メニュー" aria-expanded="false" aria-controls="global-nav-menu">
+        <i class="fa-solid fa-bars"></i><i class="fa-solid fa-xmark"></i>
+      </button>
     </div>
   </nav>
 

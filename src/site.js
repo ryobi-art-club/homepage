@@ -9,6 +9,35 @@
     openTrigger: function() {}
   };
 
+  function initNav() {
+    var nav = document.querySelector('.global-nav');
+    var toggle = nav && nav.querySelector('.nav-toggle');
+    if (!nav || !toggle) return;
+    function setOpen(open) {
+      nav.classList.toggle('is-menu-open', open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    toggle.addEventListener('click', function() {
+      setOpen(!nav.classList.contains('is-menu-open'));
+    });
+    document.addEventListener('click', function(event) {
+      if (!nav.classList.contains('is-menu-open')) return;
+      if (!nav.contains(event.target)) setOpen(false);
+    });
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') setOpen(false);
+    });
+    nav.querySelectorAll('.nav-menu a').forEach(function(link) {
+      link.addEventListener('click', function() {
+        setOpen(false);
+        var tab = link.getAttribute('data-tab-jump');
+        if (!tab) return;
+        var button = document.querySelector('[data-tab-target="' + cssEscape(tab) + '"]');
+        if (button) button.click();
+      });
+    });
+  }
+
   function initTabs() {
     document.querySelectorAll('[data-tab-shell]').forEach(function(shell) {
       var buttons = shell.querySelectorAll('[data-tab-target]');
@@ -257,6 +286,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', function() {
+    initNav();
     initTabs();
     initLightbox();
     initCarousels();
