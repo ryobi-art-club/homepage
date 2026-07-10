@@ -1018,6 +1018,7 @@ def main() -> None:
     shutil.copy2(Path(args.static_config).parent / 'stylesheet.css', output_dir / 'stylesheet.css')
     shutil.copy2(Path(args.static_config).parent / 'site.js', output_dir / 'site.js')
     shutil.copy2(Path(args.static_config).parent / 'logo.png', output_dir / 'logo.png')
+    shutil.copy2(Path(args.static_config).parent / 'clubroom.jpg', output_dir / 'clubroom.jpg')
     copy_tree(assets_root, output_dir / 'assets')
     print(f'Built site at {output_dir}')
 

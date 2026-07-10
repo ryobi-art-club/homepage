@@ -87,28 +87,45 @@
     var note = document.getElementById('materialNote');
     if (!note) return;
     var chips = Array.from(document.querySelectorAll('.material-chip.has-note'));
+    var stickyChip = null;
+
+    function renderNote(chip) {
+      note.textContent = '';
+      if (!chip) {
+        note.hidden = true;
+        return;
+      }
+      var name = document.createElement('strong');
+      name.textContent = chip.getAttribute('data-name') || '';
+      note.appendChild(name);
+      note.appendChild(document.createTextNode('　' + (chip.getAttribute('data-note') || '')));
+      note.hidden = false;
+    }
+    function setSticky(chip) {
+      stickyChip = chip;
+      chips.forEach(function(other) {
+        other.classList.toggle('is-active', other === chip);
+        other.setAttribute('aria-expanded', other === chip ? 'true' : 'false');
+      });
+      renderNote(chip);
+    }
+
     chips.forEach(function(chip) {
       chip.addEventListener('click', function() {
-        var wasActive = chip.classList.contains('is-active');
-        chips.forEach(function(other) {
-          other.classList.remove('is-active');
-          other.setAttribute('aria-expanded', 'false');
-        });
-        if (wasActive) {
-          note.hidden = true;
-          note.textContent = '';
-          return;
-        }
-        chip.classList.add('is-active');
-        chip.setAttribute('aria-expanded', 'true');
-        note.textContent = '';
-        var name = document.createElement('strong');
-        name.textContent = chip.getAttribute('data-name') || '';
-        note.appendChild(name);
-        note.appendChild(document.createTextNode('　' + (chip.getAttribute('data-note') || '')));
-        note.hidden = false;
+        setSticky(chip === stickyChip ? null : chip);
       });
     });
+    // ホバーできる環境では、乗せるだけで注釈をプレビューする(クリックで固定)。
+    // 離れたときは固定中の注釈に戻す。固定が無ければ直前の表示を残して
+    // レイアウトの上下動を減らす。
+    if (window.matchMedia && window.matchMedia('(hover: hover)').matches) {
+      chips.forEach(function(chip) {
+        chip.addEventListener('mouseenter', function() { renderNote(chip); });
+        chip.addEventListener('mouseleave', function() {
+          if (stickyChip) renderNote(stickyChip);
+        });
+      });
+    }
   }
 
   function initTabs() {
