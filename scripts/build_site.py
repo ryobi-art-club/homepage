@@ -359,16 +359,51 @@ def render_timeline(schedule: list[dict[str, str]]) -> str:
     return f'<div class="timeline">{"".join(items)}</div>'
 
 
-def render_info_points(points: list[dict[str, str]]) -> str:
-    return ''.join(
-        f"""
-        <article class="info-point">
-          <div class="info-point-label">{escape(point.get('label', ''))}</div>
-          <div class="info-point-text">{rich_text(point.get('text', ''))}</div>
-        </article>
-        """
-        for point in points
-    )
+def render_info_points(points: list[dict[str, Any]]) -> str:
+    cards = []
+    for point in points:
+        link = point.get('link') or {}
+        link_html = ''
+        if link.get('url'):
+            link_html = (
+                f'<a class="info-point-link" href="{escape(link["url"])}" target="_blank" rel="noopener noreferrer">'
+                f'<i class="fa-solid fa-location-dot" aria-hidden="true"></i>{escape(link.get("label", "地図を開く"))}'
+                '</a>'
+            )
+        image_html = ''
+        if point.get('image'):
+            image_html = f'<img class="info-point-photo" src="{escape(point["image"])}" alt="{escape(point.get("label", ""))}" loading="lazy">'
+        cards.append(
+            f"""
+            <article class="info-point">
+              <div class="info-point-label">{escape(point.get('label', ''))}</div>
+              <div class="info-point-text">{rich_text(point.get('text', ''))}</div>
+              {image_html}
+              {link_html}
+            </article>
+            """
+        )
+    return ''.join(cards)
+
+
+def render_material_chips(materials: list[Any]) -> str:
+    chips = []
+    for material in materials:
+        if isinstance(material, dict):
+            name = str(material.get('name', ''))
+            note = str(material.get('note', '') or '')
+        else:
+            name = str(material)
+            note = ''
+        if note:
+            chips.append(
+                f'<button class="material-chip has-note" type="button" data-name="{escape(name)}" data-note="{escape(note)}" aria-expanded="false">'
+                f'{escape(name)}<i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>'
+            )
+        else:
+            chips.append(f'<span>{escape(name)}</span>')
+    note_area = '<p class="material-note" id="materialNote" hidden></p>'
+    return f'<div class="material-chip-grid">{"".join(chips)}</div>{note_area}'
 
 
 
@@ -725,6 +760,49 @@ def render_exhibition_archive(items: list[dict[str, Any]]) -> str:
         )
     return f'<div class="archive-list">{"".join(cards)}</div>'
 
+def render_hero(static: dict[str, Any], recent: dict[str, Any] | None) -> str:
+    # 最近の展示会の全作品画像をヒーロー背景のスライドショーに使う。
+    # 特定の作品だけが選ばれて差が出ないよう全作品を対象にし、
+    # 読み込みは「1枚目のみ即時、以降は表示直前にJSがdata-srcから読む」方式で軽く保つ。
+    # 画像が無い場合は従来のロゴ+装飾にフォールバックする。
+    images: list[str] = []
+    if recent:
+        for work in recent.get('works', []):
+            image = str(work.get('image', '') or '')
+            if image:
+                images.append(image)
+    if images:
+        slides = []
+        for index, src in enumerate(images):
+            active = ' is-active' if index == 0 else ''
+            src_attr = f'src="{escape(src)}"' if index == 0 else f'data-src="{escape(src)}"'
+            slides.append(
+                f'<div class="hero-slide{active}"><img {src_attr} alt="" decoding="async"></div>'
+            )
+        background = (
+            f'<div class="hero-slideshow" aria-hidden="true" data-hero-slideshow>{"".join(slides)}'
+            '<div class="hero-shade"></div></div>'
+            '<div class="grid-overlay"></div>'
+        )
+        logo = ''
+    else:
+        background = """
+    <div class="decoration circle-green"></div>
+    <div class="decoration square-blue"></div>
+    <div class="grid-overlay"></div>"""
+        logo = '<img src="logo.png" alt="凌美会 ロゴ" class="hero-logo">'
+    return f"""
+  <header id="home" class="hero-section{' has-slideshow' if images else ''}">
+    {background}
+    <div class="hero-content">
+      {logo}
+      <p class="hero-kicker">{escape(static['hero_kicker'])}</p>
+      <h1 class="hero-title">{escape(static['hero_title'])}</h1>
+      <p class="hero-subtitle">{rich_text(static['hero_subtitle'])}</p>
+    </div>
+  </header>"""
+
+
 def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
     exhibitions_static = static.get('exhibitions_static', {})
     activities_static = static.get('activities_static', {})
@@ -786,17 +864,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
     </div>
   </nav>
 
-  <header id="home" class="hero-section">
-    <div class="hero-content">
-      <img src="logo.png" alt="凌美会 ロゴ" class="hero-logo">
-      <p class="hero-kicker">{escape(static['hero_kicker'])}</p>
-      <h1 class="hero-title">{escape(static['hero_title'])}</h1>
-      <p class="hero-subtitle">{rich_text(static['hero_subtitle'])}</p>
-    </div>
-    <div class="decoration circle-green"></div>
-    <div class="decoration square-blue"></div>
-    <div class="grid-overlay"></div>
-  </header>
+{render_hero(static, recent)}
 
   <main class="main-content">
     <section id="about" class="sub-section">
@@ -862,7 +930,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
           <div class="simple-card glass-card">
             <p class="eyebrow">MATERIALS</p>
             <h4 style="font-size:1.28rem;">使えるもの</h4>
-            <div class="material-chip-grid">{''.join(f'<span>{escape(x)}</span>' for x in recruit['materials'])}</div>
+            {render_material_chips(recruit['materials'])}
           </div>
           <div style="height: 18px;"></div>
           <div class="simple-card glass-card">

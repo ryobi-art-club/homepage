@@ -147,6 +147,55 @@ a { color: inherit; }
   overflow: hidden;
 }
 .hero-content { position: relative; z-index: 10; max-width: 760px; }
+
+/* 作品スライドショー背景(RECENT EXHIBITIONの作品画像) */
+.hero-slideshow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: var(--color-black);
+}
+.hero-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1.8s ease;
+}
+.hero-slide.is-active { opacity: 1; }
+.hero-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+.hero-slide.is-active img {
+  animation: hero-zoom 10s ease-out forwards;
+}
+@keyframes hero-zoom {
+  from { transform: scale(1); }
+  to { transform: scale(1.07); }
+}
+/* 白文字の可読性とダークテーマへの馴染みのための減光レイヤー。
+   下端を濃くして本文の黒背景へ滑らかに繋ぐ。 */
+.hero-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg,
+      rgba(10,10,10,0.88) 0%,
+      rgba(10,10,10,0.62) 40%,
+      rgba(10,10,10,0.66) 62%,
+      rgba(10,10,10,0.97) 100%),
+    radial-gradient(circle at center, rgba(10,10,10,0.30), transparent 70%);
+}
+.hero-section.has-slideshow .hero-kicker { color: rgba(255,255,255,0.80); }
+.hero-section.has-slideshow .hero-title,
+.hero-section.has-slideshow .hero-subtitle,
+.hero-section.has-slideshow .hero-kicker {
+  text-shadow: 0 2px 26px rgba(0,0,0,0.55);
+}
 .hero-logo {
   width: 176px;
   margin: 0 auto 28px;
@@ -299,13 +348,34 @@ a { color: inherit; }
   margin-bottom: 8px;
 }
 .info-point-text { color: rgba(255,255,255,0.86); }
+.info-point-photo {
+  width: 100%;
+  margin-top: 12px;
+  border-radius: 12px;
+}
+.info-point-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: var(--color-white);
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+.info-point-link i { color: var(--color-yellow); }
 .material-chip-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 18px;
 }
-.material-chip-grid span {
+.material-chip-grid span,
+.material-chip-grid .material-chip {
   display: inline-flex;
   align-items: center;
   padding: 10px 14px;
@@ -315,6 +385,31 @@ a { color: inherit; }
   color: rgba(255,255,255,0.86);
   font-size: 0.93rem;
 }
+.material-chip-grid .material-chip {
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+.material-chip .fa-circle-info {
+  margin-left: 8px;
+  font-size: 0.82em;
+  color: rgba(246,217,38,0.72);
+}
+.material-chip.is-active {
+  background: rgba(246,217,38,0.14);
+  border-color: rgba(246,217,38,0.42);
+  color: var(--color-white);
+}
+.material-note {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(246,217,38,0.07);
+  border: 1px solid rgba(246,217,38,0.20);
+  color: var(--text-soft);
+  font-size: 0.95rem;
+}
+.material-note strong { color: var(--color-white); }
 .timeline {
   position: relative;
   padding: 28px 0 12px;
@@ -411,6 +506,10 @@ a { color: inherit; }
 }
 .carousel-button.prev { left: 12px; }
 .carousel-button.next { right: 12px; }
+.carousel-button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
 .carousel-dots {
   display: flex;
   justify-content: center;
@@ -663,6 +762,7 @@ a { color: inherit; }
   align-content: start;
   min-width: 0;
 }
+/* 作品はカードの額縁を付けず、画像そのものを主役にする */
 .work-card {
   display: block;
   width: 100%;
@@ -670,20 +770,20 @@ a { color: inherit; }
   min-width: 0;
   height: auto;
   margin: 0;
-  padding: 14px;
+  padding: 0;
   position: relative;
   break-inside: avoid;
-  overflow: hidden;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 18px;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 .work-image-button {
   display: block;
   width: 100%;
   height: auto;
   padding: 0;
-  margin: 0 0 14px;
+  margin: 0 0 12px;
   border: 0;
   background: transparent;
   cursor: zoom-in;
@@ -702,12 +802,12 @@ a { color: inherit; }
 .work-title {
   font-weight: 700;
   margin-top: 0;
-  padding-inline: 4px;
+  padding-inline: 2px;
 }
 .work-artist {
   color: var(--text-muted);
   font-size: 0.95rem;
-  padding-inline: 4px;
+  padding-inline: 2px;
 }
 
 /* ---------- 画像グリッド(X風コラージュ) ---------- */
@@ -906,6 +1006,10 @@ a { color: inherit; }
 }
 .lightbox-button.prev { left: 22px; }
 .lightbox-button.next { right: 22px; }
+.lightbox-button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
 
 /* ---------- ご依頼 ---------- */
 .request-contact-card { text-align: left; }
@@ -967,26 +1071,19 @@ footer {
   from { transform: rotate(45deg) translate(0, 0); }
   to { transform: rotate(56deg) translate(-34px, -26px); }
 }
+/* ホバー演出はクリックで何かが起きる要素だけに付ける(押せそうで押せない、を作らない) */
 @media (hover: hover) {
-  .article-card, .request-card, .info-point, .work-card, .update-log-item {
-    transition:
-      transform 0.35s ease,
-      border-color 0.35s ease,
-      box-shadow 0.35s ease;
-  }
-  .article-card:hover, .request-card:hover, .info-point:hover, .work-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(246,217,38,0.26);
-    box-shadow: 0 16px 38px rgba(0,0,0,0.36);
-  }
-  .update-log-item:hover {
-    border-color: rgba(255,255,255,0.16);
-  }
   .work-image-button img {
     transition: transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
   }
-  .work-card:hover .work-image-button img {
-    transform: scale(1.025);
+  .work-image-button:hover img {
+    transform: scale(1.03);
+  }
+  .image-grid-item img {
+    transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .image-grid-item:hover img {
+    transform: scale(1.03);
   }
   .archive-link {
     transition: transform 0.3s ease, background 0.3s ease, border-color 0.3s ease;
@@ -995,11 +1092,14 @@ footer {
     background: rgba(246,217,38,0.14);
     border-color: rgba(246,217,38,0.34);
   }
-  .material-chip-grid span {
-    transition: transform 0.3s ease, background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  .info-point-link {
+    transition: background 0.3s ease, border-color 0.3s ease;
   }
-  .material-chip-grid span:hover {
-    transform: translateY(-2px);
+  .info-point-link:hover {
+    background: rgba(246,217,38,0.14);
+    border-color: rgba(246,217,38,0.34);
+  }
+  .material-chip.has-note:hover {
     background: rgba(246,217,38,0.12);
     border-color: rgba(246,217,38,0.36);
     color: var(--color-white);
@@ -1009,6 +1109,8 @@ footer {
   .reveal { opacity: 1; transform: none; transition: none; }
   .tab-panel.is-active { animation: none; }
   .hero-logo, .circle-green, .square-blue { animation: none; }
+  .hero-slide { transition: none; }
+  .hero-slide.is-active img { animation: none; }
   html { scroll-behavior: auto; }
 }
 
@@ -1058,6 +1160,12 @@ footer {
   .nav-brand-text { font-size: 0.95rem; letter-spacing: 0.02em; }
 
   .hero-section { min-height: auto; padding: 112px 18px 56px; }
+  /* 作品背景があるときは、モバイルでも絵をある程度見せる高さを確保 */
+  .hero-section.has-slideshow {
+    min-height: 64vh;
+    display: flex;
+    align-items: center;
+  }
   .hero-content { max-width: 100%; }
   .hero-logo { width: 150px; }
   .hero-title { letter-spacing: 0.12em; }

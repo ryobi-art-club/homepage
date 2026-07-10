@@ -12,8 +12,10 @@
   function initReveals() {
     if (!('IntersectionObserver' in window)) return;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // 巨大なコンテナ(タブ枠など)は対象にしない。親が透明なままだと
+    // 中身が丸ごと隠れて、出現がスクロールに対して遅く感じられるため。
     var targets = Array.from(document.querySelectorAll(
-      '.section-header, .simple-card, .tab-shell, .article-card, .request-card, .info-point, .timeline-item, .work-card'
+      '.section-header, .simple-card, .article-card, .request-card, .info-point, .timeline-item, .work-card'
     ));
     targets.forEach(function(el) {
       el.classList.add('reveal');
@@ -39,7 +41,7 @@
           el.style.transitionDelay = '';
         });
       });
-    }, { threshold: 0.05, rootMargin: '0px 0px -36px' });
+    }, { threshold: 0, rootMargin: '0px 0px -48px 0px' });
     targets.forEach(function(el) { observer.observe(el); });
     // 保険: 初期表示でIntersectionObserverが発火しない環境でも、
     // 画面内の要素は一定時間後に必ず表示する。
@@ -50,6 +52,63 @@
         if (rect.top < window.innerHeight && rect.bottom > 0) el.classList.add('is-visible');
       });
     }, 1500);
+  }
+
+  function initHeroSlideshow() {
+    var root = document.querySelector('[data-hero-slideshow]');
+    if (!root) return;
+    var slides = Array.from(root.querySelectorAll('.hero-slide'));
+    if (slides.length < 2) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // 2枚目以降は表示が近づいてから読み込む(全作品を並べても初期コストを増やさない)
+    function ensureLoaded(slideIndex) {
+      var img = slides[slideIndex] && slides[slideIndex].querySelector('img');
+      if (!img) return;
+      var src = img.getAttribute('data-src');
+      if (src && !img.getAttribute('src')) {
+        img.setAttribute('src', src);
+        img.removeAttribute('data-src');
+      }
+    }
+    var index = 0;
+    ensureLoaded(1);
+    window.setInterval(function() {
+      if (document.hidden) return;
+      index = (index + 1) % slides.length;
+      ensureLoaded(index);
+      ensureLoaded((index + 1) % slides.length);
+      slides.forEach(function(slide, slideIndex) {
+        slide.classList.toggle('is-active', slideIndex === index);
+      });
+    }, 5600);
+  }
+
+  function initMaterialChips() {
+    var note = document.getElementById('materialNote');
+    if (!note) return;
+    var chips = Array.from(document.querySelectorAll('.material-chip.has-note'));
+    chips.forEach(function(chip) {
+      chip.addEventListener('click', function() {
+        var wasActive = chip.classList.contains('is-active');
+        chips.forEach(function(other) {
+          other.classList.remove('is-active');
+          other.setAttribute('aria-expanded', 'false');
+        });
+        if (wasActive) {
+          note.hidden = true;
+          note.textContent = '';
+          return;
+        }
+        chip.classList.add('is-active');
+        chip.setAttribute('aria-expanded', 'true');
+        note.textContent = '';
+        var name = document.createElement('strong');
+        name.textContent = chip.getAttribute('data-name') || '';
+        note.appendChild(name);
+        note.appendChild(document.createTextNode('　' + (chip.getAttribute('data-note') || '')));
+        note.hidden = false;
+      });
+    });
   }
 
   function initTabs() {
@@ -116,6 +175,8 @@
       track.style.transform = 'translate3d(' + ((-100 * state.index) + offset) + '%,0,0)';
       var item = state.items[state.index];
       caption.textContent = item ? ((state.index + 1) + ' / ' + state.items.length + (item.caption ? '　' + item.caption : '')) : '';
+      prev.disabled = state.index === 0;
+      next.disabled = state.index === state.items.length - 1;
     }
 
     function open(gallery, index) {
@@ -144,7 +205,7 @@
     }
     function moveBy(delta) {
       if (!state.items.length) return;
-      state.index = (state.index + delta + state.items.length) % state.items.length;
+      state.index = Math.max(0, Math.min(state.items.length - 1, state.index + delta));
       render(true, 0);
     }
     function begin(event) {
@@ -161,6 +222,7 @@
       state.currentX = event.clientX;
       var delta = state.currentX - state.startX;
       if (Math.abs(delta) > 6) state.moved = true;
+      if ((state.index === 0 && delta > 0) || (state.index === state.items.length - 1 && delta < 0)) delta = delta / 3;
       render(false, delta / Math.max(slider.clientWidth, 1) * 100);
     }
     function end(event) {
@@ -213,6 +275,7 @@
       var dragging = false;
       var moved = false;
       var startX = 0;
+      var startY = 0;
       var currentX = 0;
       var pointerId = null;
       var downTrigger = null;
@@ -222,9 +285,13 @@
         track.style.transition = withTransition === false ? 'none' : 'transform 0.34s cubic-bezier(.22,.61,.36,1)';
         track.style.transform = 'translate3d(' + ((-100 * index) + offset) + '%,0,0)';
         dots.forEach(function(dot, dotIndex) { dot.classList.toggle('is-active', dotIndex === index); });
+        if (prev) prev.disabled = index === 0;
+        if (next) next.disabled = index === slides.length - 1;
       }
+      // ループさせない。末尾→先頭へ全スライドを逆走するアニメーションが
+      // 不自然なため、端では止める。
       function setIndex(nextIndex) {
-        index = (nextIndex + slides.length) % slides.length;
+        index = Math.max(0, Math.min(slides.length - 1, nextIndex));
         render(true, 0);
       }
       function suppressClickBriefly() {
@@ -236,16 +303,23 @@
         dragging = slides.length > 1;
         moved = false;
         startX = currentX = event.clientX;
+        startY = event.clientY;
         pointerId = event.pointerId;
         downTrigger = event.target && event.target.closest ? event.target.closest('[data-lightbox-gallery]') : null;
         if (dragging) render(false, 0);
         if (track.setPointerCapture) { try { track.setPointerCapture(pointerId); } catch(e) {} }
       }
       function move(event) {
-        if (!dragging || event.pointerId !== pointerId) return;
+        if (event.pointerId !== pointerId) return;
+        // 縦方向の動きが主なら「ページスクロールの意図」なのでタップ扱いしない
+        var deltaY = event.clientY - startY;
+        if (Math.abs(deltaY) > 10 && Math.abs(deltaY) > Math.abs(event.clientX - startX)) downTrigger = null;
+        if (!dragging) return;
         currentX = event.clientX;
         var delta = currentX - startX;
         if (Math.abs(delta) > 8) moved = true;
+        // 端を越える方向へのドラッグは抵抗を付ける
+        if ((index === 0 && delta > 0) || (index === slides.length - 1 && delta < 0)) delta = delta / 3;
         render(false, delta / Math.max(root.clientWidth, 1) * 100);
       }
       function end(event) {
@@ -269,11 +343,22 @@
         pointerId = null;
         downTrigger = null;
       }
+      // ブラウザがジェスチャーを引き取った(=縦スクロール開始など)ときは
+      // タップ扱いせず状態だけ戻す。end に流すとライトボックスが誤って開く。
+      function cancelPointer(event) {
+        if (pointerId !== null && event.pointerId !== pointerId) return;
+        if (track.releasePointerCapture) { try { track.releasePointerCapture(pointerId); } catch(e) {} }
+        dragging = false;
+        moved = false;
+        pointerId = null;
+        downTrigger = null;
+        render(true, 0);
+      }
 
       track.addEventListener('pointerdown', begin);
       track.addEventListener('pointermove', move);
       track.addEventListener('pointerup', end);
-      track.addEventListener('pointercancel', end);
+      track.addEventListener('pointercancel', cancelPointer);
       if (prev) prev.addEventListener('click', function(event) { event.preventDefault(); event.stopPropagation(); setIndex(index - 1); });
       if (next) next.addEventListener('click', function(event) { event.preventDefault(); event.stopPropagation(); setIndex(index + 1); });
       dots.forEach(function(dot, dotIndex) {
@@ -301,6 +386,8 @@
 
   document.addEventListener('DOMContentLoaded', function() {
     initReveals();
+    initHeroSlideshow();
+    initMaterialChips();
     initTabs();
     initLightbox();
     initCarousels();
