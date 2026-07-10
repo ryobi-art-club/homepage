@@ -169,9 +169,12 @@ a { color: inherit; }
   object-fit: cover;
   object-position: center;
   display: block;
+  /* 待機・退場時はズーム完了状態で保持する。ズーム(5.2s)は切替間隔(5.6s)より
+     先に終わるので、フェードアウト中にサイズが巻き戻らない。 */
+  transform: scale(1.07);
 }
 .hero-slide.is-active img {
-  animation: hero-zoom 10s ease-out forwards;
+  animation: hero-zoom 5.2s ease-out forwards;
 }
 @keyframes hero-zoom {
   from { transform: scale(1); }
@@ -264,6 +267,16 @@ a { color: inherit; }
   border-radius: var(--radius-xl);
   backdrop-filter: blur(16px);
   box-shadow: var(--shadow);
+}
+/* 面色の階層ルール: シェル(タブ枠・ページ直下のカード)はガラスグラデーション、
+   シェル内のカードはフラットな白4%に統一する。同じ階層で濃淡が
+   混在しないようにするため(例: 活動場所カードとMATERIALSカード)。 */
+.tab-shell .glass-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  backdrop-filter: none;
+  box-shadow: none;
 }
 .simple-card { padding: 28px; }
 .simple-card p { color: var(--text-soft); }
@@ -1110,6 +1123,7 @@ footer {
   .tab-panel.is-active { animation: none; }
   .hero-logo, .circle-green, .square-blue { animation: none; }
   .hero-slide { transition: none; }
+  .hero-slide img { transform: none; }
   .hero-slide.is-active img { animation: none; }
   html { scroll-behavior: auto; }
 }
