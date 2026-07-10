@@ -346,8 +346,23 @@ a { color: inherit; }
   grid-template-columns: repeat(2, minmax(0,1fr));
   gap: 18px 20px;
   margin-bottom: 28px;
-  /* 写真つきカードがあっても、隣のカードを引き伸ばさない */
-  align-items: start;
+}
+/* 2カラム時: 写真つきカード(活動場所)は左列全体、他のカードは右列に縦積み。
+   カード同士の高低差をなくし、写真はカードの余り高さいっぱいに表示する。
+   span 3 は「写真つき1枚+テキスト3枚」の現構成に合わせた値。 */
+@media (min-width: 769px) {
+  .info-point.has-photo {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    display: flex;
+    flex-direction: column;
+  }
+  .info-point.has-photo .info-point-photo {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    object-fit: cover;
+  }
 }
 .info-point {
   padding: 18px;

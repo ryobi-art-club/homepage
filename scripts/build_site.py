@@ -375,7 +375,7 @@ def render_info_points(points: list[dict[str, Any]]) -> str:
             image_html = f'<img class="info-point-photo" src="{escape(point["image"])}" alt="{escape(point.get("label", ""))}" loading="lazy">'
         cards.append(
             f"""
-            <article class="info-point">
+            <article class="info-point{' has-photo' if image_html else ''}">
               <div class="info-point-label">{escape(point.get('label', ''))}</div>
               <div class="info-point-text">{rich_text(point.get('text', ''))}</div>
               {image_html}
