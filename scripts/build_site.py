@@ -793,6 +793,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
   <script defer src="site.js"></script>
 </head>
 <body>
+  <div class="ink-layer" data-ink-layer aria-hidden="true"></div>
   <nav class="global-nav">
     <div class="nav-container">
       <a href="#home" class="nav-brand">

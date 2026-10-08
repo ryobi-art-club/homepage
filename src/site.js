@@ -401,8 +401,146 @@
     });
   }
 
+  // スクロールに連動するインク。ページの左右の端に一定間隔でインクを置き、
+  // 画面に入ると弾けるように現れ、さらにスクロールすると下へ垂れていく。
+  // 垂れた長さはその時点までの最大値を保ち、上に戻っても縮めない。
+  // 形と配置は番号ごとに決まった乱数で作るので、いつ開いても同じになる。
+  function initInkSplats() {
+    var layer = document.querySelector('[data-ink-layer]');
+    if (!layer) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    var COLORS = ['ink-yellow', 'ink-green', 'ink-blue', 'ink-red'];
+    var SPACING = 1000; // インク同士の縦の間隔(px)
+    var splats = [], frame = 0, lastWidth = 0, lastHeight = 0;
+
+    function seeded(seed) {
+      return function() {
+        seed = (seed + 0x6D2B79F5) | 0;
+        var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function el(name, attrs) {
+      var node = document.createElementNS(SVG_NS, name);
+      Object.keys(attrs).forEach(function(key) { node.setAttribute(key, attrs[key]); });
+      return node;
+    }
+    // 半径を揺らした点を閉じた曲線(Catmull-Rom)でつないで、いびつな円を作る
+    function blobPath(cx, cy, r, rand) {
+      var n = 11, pts = [];
+      for (var i = 0; i < n; i++) {
+        var angle = i / n * Math.PI * 2, rr = r * (0.8 + rand() * 0.35);
+        pts.push([cx + Math.cos(angle) * rr, cy + Math.sin(angle) * rr]);
+      }
+      var d = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+      for (var k = 0; k < n; k++) {
+        var p0 = pts[(k + n - 1) % n], p1 = pts[k], p2 = pts[(k + 1) % n], p3 = pts[(k + 2) % n];
+        d += 'C' + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + ' ' + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1) +
+          ' ' + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + ' ' + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1) +
+          ' ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1);
+      }
+      return d + 'Z';
+    }
+
+    function makeSplat(index, top, vw) {
+      var rand = seeded(index * 977 + 13);
+      var mobile = vw < 769;
+      var r = (mobile ? 46 : 78) + rand() * (mobile ? 26 : 56);
+      var pad = r * 0.6, maxDrip = (mobile ? 160 : 260) + rand() * (mobile ? 140 : 260);
+      var width = (r + pad) * 2, height = (r + pad) * 2 + maxDrip;
+      var cx = r + pad, cy = r + pad;
+      var onLeft = index % 2 === 0;
+      // 中心を画面の端付近に置き、半分以上を画面外に出して本文にかかりにくくする
+      var centerX = onLeft ? r * (-0.35 + rand() * 0.4) : vw - r * (-0.35 + rand() * 0.4);
+      var svg = el('svg', { width: width.toFixed(0), height: height.toFixed(0), viewBox: '0 0 ' + width.toFixed(1) + ' ' + height.toFixed(1) });
+      svg.setAttribute('class', 'ink-splat ' + COLORS[index % COLORS.length]);
+      svg.style.left = (centerX - cx).toFixed(1) + 'px';
+      svg.style.top = (top - cy).toFixed(1) + 'px';
+
+      // 筋はインクのうち画面に見えている部分からだけ垂らす(SVG内の座標で範囲を求める)
+      var svgLeft = centerX - cx;
+      var dripMin = Math.max(cx - r * 0.55, -svgLeft + 10);
+      var dripMax = Math.min(cx + r * 0.55, vw - svgLeft - 10);
+      var drips = [], count = 2 + Math.floor(rand() * 2);
+      for (var i = 0; i < count; i++) {
+        var w = r * (0.1 + rand() * 0.1), y0 = cy + r * 0.3;
+        var x = dripMin + w / 2 + rand() * Math.max(0, dripMax - dripMin - w);
+        var rect = el('rect', { x: (x - w / 2).toFixed(1), y: y0.toFixed(1), width: w.toFixed(1), height: '0', rx: (w / 2).toFixed(1) });
+        var bulb = el('circle', { cx: x.toFixed(1), cy: y0.toFixed(1), r: (w * 0.7).toFixed(1) });
+        svg.appendChild(rect);
+        svg.appendChild(bulb);
+        drips.push({ rect: rect, bulb: bulb, y0: y0, max: maxDrip * (0.35 + rand() * 0.65) });
+      }
+      var pop = el('g', { 'class': 'ink-pop' });
+      pop.appendChild(el('path', { d: blobPath(cx, cy, r, rand) }));
+      for (var s = 0, dots = 4 + Math.floor(rand() * 4); s < dots; s++) {
+        var angle = rand() * Math.PI * 2, dist = r * (1.05 + rand() * 0.45);
+        pop.appendChild(el('circle', {
+          cx: (cx + Math.cos(angle) * dist).toFixed(1), cy: (cy + Math.sin(angle) * dist).toFixed(1),
+          r: (r * (0.04 + rand() * 0.09)).toFixed(1)
+        }));
+      }
+      svg.appendChild(pop);
+      layer.appendChild(svg);
+      return { svg: svg, pop: pop, top: top, drips: drips, splashed: false, progress: 0 };
+    }
+
+    function update(instant) {
+      frame = 0;
+      var vh = window.innerHeight, scrollY = window.scrollY;
+      splats.forEach(function(splat) {
+        var inView = splat.top - scrollY;
+        if (!splat.splashed && inView < vh * 0.85) {
+          splat.splashed = true;
+          if (instant) splat.pop.style.transition = 'none';
+          splat.svg.classList.add('is-splashed');
+          if (instant) { splat.pop.getBoundingClientRect(); splat.pop.style.transition = ''; }
+        }
+        // 画面の下15%の位置で弾けてから、画面の高さ0.6枚分のスクロールで垂れきる。
+        // 垂れている間はインクが画面内にあるので、伸びる様子が見える
+        var progress = clamp((vh * 0.85 - inView) / (vh * 0.6), 0, 1);
+        if (progress <= splat.progress) return;
+        splat.progress = progress;
+        var eased = 1 - Math.pow(1 - progress, 2);
+        splat.drips.forEach(function(drip) {
+          var length = drip.max * eased;
+          drip.rect.setAttribute('height', length.toFixed(1));
+          drip.bulb.setAttribute('cy', (drip.y0 + length).toFixed(1));
+        });
+      });
+    }
+
+    // ページの高さ(タブ切替で変わる)か幅が変わったら並べ直す。
+    // 画面より上にあるインクは、垂れきった状態で即座に描き直す
+    function build() {
+      var vw = window.innerWidth, pageHeight = document.body.offsetHeight;
+      if (vw === lastWidth && pageHeight === lastHeight) return;
+      lastWidth = vw;
+      lastHeight = pageHeight;
+      layer.textContent = '';
+      layer.style.height = pageHeight + 'px';
+      var hero = document.querySelector('.hero-section');
+      var start = (hero ? hero.offsetHeight : 0) + 260;
+      splats = [];
+      for (var i = 0, top = start; top < pageHeight - 200; i++, top += SPACING) {
+        splats.push(makeSplat(i, top, vw));
+      }
+      update(true);
+    }
+
+    window.addEventListener('scroll', function() {
+      if (!frame) frame = window.requestAnimationFrame(function() { update(false); });
+    }, { passive: true });
+    if ('ResizeObserver' in window) new ResizeObserver(build).observe(document.body);
+    else window.addEventListener('resize', build);
+    build();
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
     initReveals();
+    initInkSplats();
     initHeroSlideshow();
     initMaterialChips();
     initTabs();

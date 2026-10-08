@@ -37,21 +37,40 @@ body {
   line-height: 1.75;
   overflow-x: hidden;
 }
-/* 背景のグラデーションはビューポート固定レイヤーに描く。
-   body背景に直接描くとページ全体(=タブごとに高さが変わる)が基準になり、
-   タブ切替で色味の広がりが変わってしまうため。 */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at top left, rgba(136, 196, 132, 0.10), transparent 42%),
-    radial-gradient(circle at bottom right, rgba(33, 54, 148, 0.15), transparent 48%);
-}
+/* 背景は黒一色。動きはスクロールに連動するインク(.ink-layer)が担う */
 img { max-width: 100%; display: block; }
 a { color: inherit; }
+
+/* ---------- スクロール連動のインク ----------
+   ページの左右の端にブランド4色のインクが付き、スクロールで画面に入ると
+   弾けるように現れ(.is-splashed)、さらに進むと下へ垂れていく。
+   本文の後ろ(z-index: -1)に置き、ヒーローより下にだけ配置する。
+   形と配置は site.js の initInkSplats が決まった乱数で生成する */
+.ink-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* 弾けるまでは丸ごと隠す。垂れる筋の先の雫(長さ0の時点ではインクの中心付近の点)が
+   先に見えてしまわないように */
+.ink-splat { position: absolute; overflow: visible; opacity: 0.42; visibility: hidden; }
+.ink-splat.is-splashed { visibility: visible; }
+.ink-yellow { fill: var(--color-yellow); }
+.ink-green { fill: var(--color-green); }
+.ink-blue { fill: #4a64d8; } /* ブランドの青(#213694)は黒地では沈むので明るくする */
+.ink-red { fill: var(--color-red); }
+.ink-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0.25);
+  opacity: 0;
+  transition: transform 0.55s cubic-bezier(0.2, 1.6, 0.4, 1), opacity 0.2s ease;
+}
+.ink-splat.is-splashed .ink-pop { transform: none; opacity: 1; }
 
 /* ---------- グローバルナビ ---------- */
 .global-nav {
@@ -151,9 +170,8 @@ a { color: inherit; }
 .hero-content { position: relative; z-index: 10; max-width: 760px; }
 
 /* 作品スライドショー背景(RECENT EXHIBITIONの作品画像) */
-/* 下端は透明へ消してページ背景(body::before のグラデーション)に溶かす。
-   不透明な黒で終えると、背景に色味がある所でヒーロー下端に横の境目が出る。
-   また高さ(90vh)が端数のとき、ズーム中の写真(GPU合成レイヤー)と減光層の
+/* 下端は透明へ消してページ背景に溶かす。
+   高さ(90vh)が端数のとき、ズーム中の写真(GPU合成レイヤー)と減光層の
    端の丸めがずれて最下端1pxに写真が露出し白い筋になることがあるが、
    最下端が透明なのでその行も見えなくなる */
 .hero-slideshow {
