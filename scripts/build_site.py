@@ -340,17 +340,17 @@ def render_update_log(change_log: list[dict[str, Any]], data: dict[str, Any]) ->
 
 def render_timeline(schedule: list[dict[str, str]]) -> str:
     color_class = {
-        'yellow': 'border-yellow',
-        'blue': 'border-blue',
-        'green': 'border-green',
-        'white': 'border-white',
+        'yellow': 'dot-yellow',
+        'blue': 'dot-blue',
+        'green': 'dot-green',
+        'white': 'dot-white',
     }
     items = []
     for row in schedule:
         items.append(
             f"""
             <div class="timeline-item">
-              <div class="timeline-dot {color_class.get(row.get('accent', 'yellow'), 'border-yellow')}"></div>
+              <div class="timeline-dot {color_class.get(row.get('accent', 'yellow'), 'dot-yellow')}"></div>
               <div class="timeline-date">{escape(row.get('period', ''))}</div>
               <div class="timeline-content">{escape(row.get('label', ''))}</div>
             </div>
@@ -423,16 +423,19 @@ def render_activity_cards(items: list[dict[str, Any]]) -> str:
     ordered = sorted(items, key=lambda x: x.get('created_at', ''), reverse=True)
     cards = []
     for item in ordered:
+        images = render_image_grid(item.get('images', []), item.get('title', '活動記録・告知'), 'activity-' + str(item.get('id', '')))
         cards.append(
             f"""
-            <article class="article-card">
-              <div class="article-meta">
-                <span>{escape(activity_category_label(item.get('category', 'record')))}</span>
-                <time datetime="{escape(item.get('created_at', ''))}">{fmt_date(item.get('created_at', ''))}</time>
+            <article class="article-card{' has-images' if images else ''}">
+              <div class="article-text">
+                <div class="article-meta">
+                  <span>{escape(activity_category_label(item.get('category', 'record')))}</span>
+                  <time datetime="{escape(item.get('created_at', ''))}">{fmt_date(item.get('created_at', ''))}</time>
+                </div>
+                <h4 class="article-title">{escape(item.get('title', ''))}</h4>
+                <p class="article-body">{nl2br(item.get('body', ''))}</p>
               </div>
-              <h4 class="article-title">{escape(item.get('title', ''))}</h4>
-              <p class="article-body">{nl2br(item.get('body', ''))}</p>
-              {render_image_grid(item.get('images', []), item.get('title', '活動記録・告知'), 'activity-' + str(item.get('id', '')))}
+              {images}
             </article>
             """
         )
@@ -445,13 +448,16 @@ def render_request_cards(items: list[dict[str, Any]]) -> str:
     ordered = sorted(items, key=lambda x: int(x.get('sort_order', 9999)))
     cards = []
     for item in ordered:
+        images = render_image_grid(item.get('images', []), item.get('title', '取り組み事例'), 'request-' + str(item.get('id', '')))
         cards.append(
             f"""
-            <article class="request-card">
-              <div class="request-meta"><span>過去の取り組み事例</span></div>
-              <h4 class="request-title">{escape(item.get('title', ''))}</h4>
-              <p class="request-body">{nl2br(item.get('body', ''))}</p>
-              {render_image_grid(item.get('images', []), item.get('title', '取り組み事例'), 'request-' + str(item.get('id', '')))}
+            <article class="request-card{' has-images' if images else ''}">
+              <div class="article-text">
+                <div class="request-meta"><span>過去の取り組み事例</span></div>
+                <h4 class="request-title">{escape(item.get('title', ''))}</h4>
+                <p class="request-body">{nl2br(item.get('body', ''))}</p>
+              </div>
+              {images}
             </article>
             """
         )

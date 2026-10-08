@@ -14,6 +14,7 @@
   --color-green: #88c484;
   --color-red: #f36c6c;
   --color-paper: #f2efe8;
+  --color-blue-bright: #4a64d8; /* ブランドの青は黒地で沈むため、点やインクにはこちらを使う */
   --glass: rgba(255,255,255,0.05);
   --divider: rgba(255,255,255,0.10);
   --rule-strong: 2px solid rgba(255,255,255,0.26);
@@ -61,7 +62,7 @@ a { color: inherit; }
 .ink-splat.is-splashed { visibility: visible; }
 .ink-yellow { fill: var(--color-yellow); }
 .ink-green { fill: var(--color-green); }
-.ink-blue { fill: #4a64d8; } /* ブランドの青(#213694)は黒地では沈むので明るくする */
+.ink-blue { fill: var(--color-blue-bright); }
 .ink-red { fill: var(--color-red); }
 .ink-pop {
   transform-box: fill-box;
@@ -582,19 +583,18 @@ a { color: inherit; }
   padding-left: 76px;
   margin-bottom: 26px;
 }
+/* 塗りつぶした点。背景色の縁は付けない(後ろをインクが通ると黒い輪になって見えるため) */
 .timeline-dot {
   position: absolute;
-  left: 24px; top: 5px;
-  width: 20px; height: 20px;
+  left: 28px; top: 6px; /* 縦線(left 34px, 幅2px)の中心35pxに点の中心を合わせる */
+  width: 14px; height: 14px;
   border-radius: 50%;
-  background: var(--color-black);
-  border: 4px solid;
   z-index: 2;
 }
-.border-yellow { border-color: var(--color-yellow); }
-.border-blue { border-color: var(--color-blue); }
-.border-green { border-color: var(--color-green); }
-.border-white { border-color: rgba(255,255,255,0.9); }
+.dot-yellow { background: var(--color-yellow); }
+.dot-blue { background: var(--color-blue-bright); }
+.dot-green { background: var(--color-green); }
+.dot-white { background: var(--color-paper); }
 .timeline-date { font-size: 0.86rem; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 4px; }
 .timeline-content { font-size: 1.08rem; font-weight: 700; }
 
@@ -713,15 +713,18 @@ a { color: inherit; }
 .dm-carousel .carousel-dots { margin-top: 12px; }
 .dm-carousel .carousel-button { display: none; }
 
-/* 新歓カレンダーカルーセル(常に16:9) */
+/* 新歓カレンダーカルーセル(16:9の枠)。
+   カレンダーは文字が欠けると意味がないので、切り抜かずに枠内へ全体を収める
+   (縦長の画像は左右に黒い余白が付く)。枠の高さが画面の70%を超えないよう幅も絞り、中央に置く */
 .recruit-carousel {
   width: 100%;
-  max-width: none;
+  max-width: calc(70vh * 16 / 9);
+  margin-inline: auto;
 }
-.recruit-carousel .carousel-viewport { cursor: grab; }
+.recruit-carousel .carousel-viewport { cursor: grab; background: #000; }
 .recruit-carousel .carousel-viewport:active { cursor: grabbing; }
 .recruit-carousel .carousel-slide { aspect-ratio: 16 / 9; }
-.recruit-carousel .carousel-slide img { object-fit: cover; }
+.recruit-carousel .carousel-slide img { object-fit: contain; }
 
 /* ---------- 展示会 ---------- */
 .exhibition-stack { display: grid; }
@@ -890,6 +893,20 @@ a { color: inherit; }
 }
 .article-title, .request-title { font-size: 1.42rem; margin-bottom: 10px; }
 .article-body, .request-body { color: var(--text-soft); white-space: pre-wrap; }
+/* PC: 写真のある記事は「文章は左、写真は右」の2列にする。1行の字数を抑えて読みやすくし、
+   写真が本文幅いっぱいに広がって見切れるのも防ぐ。展示会カード(文章左・DM右)と同じ構成で、
+   縦方向も同じく中央揃え(高い方に合わせ、低い方がその中央に来る) */
+@media (min-width: 1025px) {
+  .article-card.has-images,
+  .request-card.has-images {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 36px;
+    align-items: center;
+  }
+  .article-card.has-images .image-grid,
+  .request-card.has-images .image-grid { margin-top: 0; }
+}
 
 /* ---------- 作品ギャラリー(最近の展示) ---------- */
 /* 行方式: 1行の中で画像の高さを揃え、幅を縦横比(--ratio)に比例させる。
@@ -1172,10 +1189,21 @@ a { color: inherit; }
   padding-top: var(--rule-gap);
 }
 .request-contact-heading { font-size: 1.34rem; font-weight: 800; margin: 4px 0 10px; color: var(--color-white); }
-.request-contact-list { list-style: none; display: grid; gap: 12px; margin-top: 12px; }
-.request-contact-list li { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; align-items: center; }
-.request-contact-list span { color: var(--text-muted); }
-.request-contact-list a { text-decoration: none; color: var(--color-white); font-weight: 700; }
+/* ラベルのすぐ右に値を置く。3行と短いので区切り線は付けず、余白だけで並べる */
+.request-contact-list { list-style: none; margin-top: 12px; }
+.request-contact-list li {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding: 6px 0;
+}
+.request-contact-list span { color: var(--text-muted); font-size: 0.88rem; }
+.request-contact-list a { text-decoration: none; color: var(--color-white); font-weight: 700; overflow-wrap: anywhere; }
+@media (hover: hover) {
+  .request-contact-list a { transition: color 0.25s ease; }
+  .request-contact-list a:hover { color: var(--color-yellow); }
+}
 
 /* ---------- フッター ---------- */
 footer {
@@ -1407,6 +1435,6 @@ footer {
   :root { --rule-gap: 26px; }
   .hero-section { min-height: auto; padding: 104px 16px 54px; }
   .tab-buttons { grid-template-columns: 1fr; }
-  .request-contact-list li { flex-direction: column; gap: 4px; align-items: flex-start; }
+  .request-contact-list li { grid-template-columns: 1fr; gap: 4px; }
   .carousel-button { width: 38px; height: 38px; }
 }
