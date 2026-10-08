@@ -287,8 +287,14 @@ a { color: inherit; }
   color: var(--color-yellow);
   margin-bottom: 14px;
 }
+/* 見出しとリード文は文節の切れ目で折り返す(「ペース／で」のような単語の途中での改行を防ぐ)。
+   未対応のブラウザでは通常の折り返しになるだけ */
+.hero-content, .section-title, .section-subtitle, .exhibition-title, .exhibition-subtitle {
+  word-break: auto-phrase;
+}
 .section-title { font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.28; margin-bottom: 16px; }
-.section-subtitle { max-width: 760px; font-size: 1.02rem; color: var(--text-soft); }
+/* 説明文は2〜3行と短いので幅の上限を設けず、本文の幅いっぱいまで使う */
+.section-subtitle { font-size: 1.02rem; color: var(--text-soft); }
 /* 区切りのルール: 情報のまとまりは角丸の枠で囲まず、線と余白で分ける。
    枠の入れ子で線が増え、本文幅が削られるのを避けるため。
    線は2段階: ブロック同士・見出しの下は太線(--rule-strong)、
@@ -321,40 +327,73 @@ a { color: inherit; }
 }
 
 /* ---------- 更新履歴 ---------- */
-/* ページ直下のブロック(更新履歴)の見出しは、薄い白の帯にしてリスト上端の線に載せる */
+/* 更新履歴は箱にする: 上端に見出しの帯、下端に帯、左右に細線。
+   スクロールする範囲がひと目で分かるようにする。
+   帯の背景と左右の線は z-index: -2 の層に描き、インク(.ink-layer, -1)より後ろに置く。
+   インクが帯の上に乗り、文字はインクのさらに上に残る。帯は不透明にして、
+   左右の線が帯の上に透けないようにする(同じ層では線を先に描く) */
+.sub-section > .section-header + .simple-card {
+  position: relative;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.sub-section > .section-header + .simple-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  border-left: 1px solid var(--divider);
+  border-right: 1px solid var(--divider);
+  border-radius: 6px;
+}
 .sub-section > .section-header + .simple-card > .eyebrow {
+  position: relative;
   display: block;
   margin-bottom: 0;
   padding: 10px 14px;
-  background: rgba(255,255,255,0.07);
-  border-radius: 6px 6px 0 0;
 }
-/* 上下の線でスクロール範囲を示し、上下端のフェードで続きがあることを示す。
-   フェードは背景色に依存しないようマスクで透過させる。1枚目は上下32pxを
-   透過させつつ線(端2px)は残すグラデーション、2枚目は右端のスクロールバーを
-   残す帯。上下の padding 32px はフェード帯ぶんで、端までスクロールすれば
-   項目はフェードの外に出る */
+.sub-section > .section-header + .simple-card > .eyebrow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: #1b1b1b;
+}
+.sub-section > .section-header + .simple-card::after {
+  content: "";
+  position: relative;
+  z-index: -2;
+  display: block;
+  height: 12px;
+  background: #1b1b1b;
+}
+.sub-section > .section-header + .simple-card > .empty-message { padding: 18px 14px; }
+/* 上下端のフェードで続きがあることを示す。フェードは背景色に依存しないよう
+   マスクで透過させる。1枚目は上下32pxを透過させるグラデーション、2枚目は
+   右端のスクロールバーを残す帯。上下の padding 32px はフェード帯ぶんで、
+   端までスクロールすれば項目はフェードの外に出る */
 .update-log-list {
   list-style: none;
   display: grid;
   gap: 0;
   max-height: 440px;
   overflow: auto;
-  padding: 32px 6px 32px 0;
-  border-top: 2px solid var(--divider);
-  border-bottom: 2px solid var(--divider);
+  padding: 32px 8px 32px 14px;
   --fade-mask:
-    linear-gradient(to bottom,
-      #000 0 2px, transparent 2px, #000 34px,
-      #000 calc(100% - 34px), transparent calc(100% - 2px), #000 calc(100% - 2px)),
-    linear-gradient(to left, #000 10px, transparent 10px);
+    linear-gradient(to bottom, transparent, #000 32px, #000 calc(100% - 32px), transparent),
+    linear-gradient(to left, #000 12px, transparent 12px);
   -webkit-mask-image: var(--fade-mask);
   mask-image: var(--fade-mask);
 }
-.update-log-list::-webkit-scrollbar { width: 10px; }
-/* つまみが上下の線に接しないよう、トラックの端に余白を取る */
-.update-log-list::-webkit-scrollbar-track { margin: 10px 0; }
-.update-log-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 999px; }
+.update-log-list::-webkit-scrollbar { width: 12px; }
+/* つまみが上下の帯に接しないよう、トラックの端に余白を取る */
+.update-log-list::-webkit-scrollbar-track { margin: 8px 0; }
+/* つまみは透明な枠で細く見せ、右側の線から離す */
+.update-log-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.18) padding-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
 .update-log-item {
   display: grid;
   gap: 6px;
@@ -410,17 +449,23 @@ a { color: inherit; }
 }
 /* 2カラム時: 写真つきカード(活動場所)は左列全体、他のカードは右列に縦積み。
    カード同士の高低差をなくし、写真はカードの余り高さいっぱいに表示する。
-   span 3 は「写真つき1枚+テキスト3枚」の現構成に合わせた値。 */
+   右列の項目の上下に余白を多めに取り、写真が横長に切れすぎないようにする。
+   またがる行数(--rows)は build_site.py がテキストの項目数から入れる。 */
 @media (min-width: 769px) {
+  .info-grid { row-gap: 28px; }
+  .info-point:not(.has-photo) + .info-point { padding-top: 28px; }
   .info-point.has-photo {
     grid-column: 1;
-    grid-row: 1 / span 3;
+    grid-row: 1 / span var(--rows, 3);
     display: flex;
     flex-direction: column;
   }
-  .info-point.has-photo .info-point-photo {
+  .info-point.has-photo .info-point-photo-button {
     flex: 1 1 0;
     min-height: 0;
+  }
+  .info-point.has-photo .info-point-photo {
+    height: 100%;
     max-height: none;
     object-fit: cover;
   }
@@ -439,10 +484,20 @@ a { color: inherit; }
   margin-bottom: 8px;
 }
 .info-point-text { color: rgba(255,255,255,0.86); }
-.info-point-photo {
+/* 写真はクリックでライトボックスを開く(他の画像と同じ) */
+.info-point-photo-button {
+  display: block;
   width: 100%;
   margin-top: 12px;
+  padding: 0;
+  border: 0;
   border-radius: 12px;
+  overflow: hidden;
+  background: transparent;
+  cursor: zoom-in;
+}
+.info-point-photo {
+  width: 100%;
   max-height: 260px;
   object-fit: cover;
 }
@@ -629,7 +684,7 @@ a { color: inherit; }
   width: min(100%, 470px);
   max-width: 470px;
   justify-self: end;
-  align-self: start;
+  align-self: center;
   margin-left: auto;
 }
 .dm-carousel {
@@ -672,12 +727,19 @@ a { color: inherit; }
 .archive-list > .glass-card:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
 .upcoming-list { display: grid; }
 .exhibition-heading { margin-bottom: 18px; }
+/* 見出しは PC では本文列の中、スマホではカード先頭に出す(build_site.py の render_exhibition_heading) */
+.exhibition-mobile-heading { display: none; }
+/* 行の上下の余白を削って、文字の上端を箱の上端に合わせる。
+   横に並ぶDMの上端と文字の上端が揃い、DMがはみ出して見えないようにするため。
+   text-box 未対応のブラウザでも line-height: 1 でほぼ揃う */
 .exhibition-kicker {
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.22em;
+  line-height: 1;
+  text-box: trim-both cap alphabetic;
   color: var(--color-yellow);
-  margin-bottom: 10px;
+  margin-bottom: 16px;
 }
 .exhibition-title {
   font-size: clamp(1.8rem, 3vw, 2.7rem);
@@ -697,11 +759,15 @@ a { color: inherit; }
   font-size: 1.02rem;
   line-height: 1.9;
 }
+/* 紹介文が未入力の展示会では、空の段落の余白を残さない */
+.exhibition-overview:empty { display: none; }
+/* DMは縦方向の中央に置く。DMの方が長ければ行の高さがDMで決まるので
+   結果的に上揃えになり、展示会情報の方が長ければDMがその中央に来る */
 .exhibition-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 272px);
   gap: 20px;
-  align-items: start;
+  align-items: center;
   justify-content: stretch;
 }
 .exhibition-hero > * { min-width: 0; }
@@ -776,7 +842,6 @@ a { color: inherit; }
 
 /* アーカイブ */
 .archive-list { display: grid; }
-.archive-mobile-heading { display: none; }
 .archive-hero { grid-template-columns: minmax(0, 1fr) minmax(220px, 280px); }
 .archive-title { font-size: clamp(1.4rem, 2.5vw, 2rem); }
 .archive-actions {
@@ -830,9 +895,19 @@ a { color: inherit; }
 .work-gallery {
   display: flex;
   flex-wrap: wrap;
-  gap: 24px 14px;
-  margin-top: 28px;
+  gap: 32px 24px;
+  margin-top: 16px;
 }
+/* 展示の説明・DMと出展作品の間を細線で区切り、会期・会場と同じ体裁のラベルを置く */
+.work-gallery-label {
+  margin-top: var(--rule-gap);
+  padding-top: 18px;
+  border-top: 1px solid var(--divider);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+}
+.work-gallery-label span { margin-left: 10px; }
 .work-gallery::after {
   content: "";
   flex-grow: 999;
@@ -1164,6 +1239,12 @@ footer {
   .image-grid-item:hover img {
     transform: scale(1.03);
   }
+  .info-point-photo {
+    transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .info-point-photo-button:hover .info-point-photo {
+    transform: scale(1.03);
+  }
   .archive-link,
   .archive-link i {
     transition: color 0.25s ease, border-color 0.25s ease;
@@ -1265,9 +1346,9 @@ footer {
     margin: 0 auto 18px;
   }
 
-  /* アーカイブ: 見出しをカード先頭に出し、DM→本文の順にする */
-  .archive-mobile-heading { display: block; margin-bottom: 16px; }
-  .archive-card .archive-desktop-heading { display: none; }
+  /* 展示会カード: 見出しをカード先頭に出し、DM→本文の順にする */
+  .exhibition-mobile-heading { display: block; margin-bottom: 16px; }
+  .exhibition-desktop-heading { display: none; }
   .archive-hero .dm-poster-wrap {
     order: 1;
     justify-self: center;

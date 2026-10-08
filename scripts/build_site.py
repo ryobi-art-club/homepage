@@ -361,6 +361,8 @@ def render_timeline(schedule: list[dict[str, str]]) -> str:
 
 def render_info_points(points: list[dict[str, Any]]) -> str:
     cards = []
+    # 写真つきの項目は PC で左列全体を占める。右列に並ぶ項目数ぶんの行にまたがらせる
+    photo_rows = f' style="--rows: {max(1, sum(1 for point in points if not point.get("image")))};"'
     for point in points:
         link = point.get('link') or {}
         link_html = ''
@@ -372,10 +374,16 @@ def render_info_points(points: list[dict[str, Any]]) -> str:
             )
         image_html = ''
         if point.get('image'):
-            image_html = f'<img class="info-point-photo" src="{escape(point["image"])}" alt="{escape(point.get("label", ""))}" loading="lazy">'
+            label = escape(point.get('label', ''))
+            image_html = (
+                f'<button class="info-point-photo-button" type="button" data-lightbox-gallery="info-{label}" '
+                f'data-lightbox-index="0" data-lightbox-caption="{label}" aria-label="{label}の写真を拡大">'
+                f'<img class="info-point-photo" src="{escape(point["image"])}" alt="{label}" loading="lazy">'
+                '</button>'
+            )
         cards.append(
             f"""
-            <article class="info-point{' has-photo' if image_html else ''}">
+            <article class="info-point{' has-photo' if image_html else ''}"{photo_rows if image_html else ''}>
               <div class="info-point-label">{escape(point.get('label', ''))}</div>
               <div class="info-point-text">{rich_text(point.get('text', ''))}</div>
               {image_html}
@@ -489,6 +497,19 @@ def render_exhibition_subtitle(item: dict[str, Any]) -> str:
     return f'<div class="exhibition-subtitle">{escape(subtitle)}</div>'
 
 
+def render_exhibition_heading(item: dict[str, Any], kicker: str, placement: str, title_class: str = '') -> str:
+    """展示会カードの見出し。PC では本文列の中(placement='desktop')に置いて DM と横に並べ、
+    スマホではカードの先頭(placement='mobile')に出して「見出し→DM→本文」の順にする。
+    どちらも出力し、表示の切り替えは CSS で行う。"""
+    return f"""
+    <div class="exhibition-heading exhibition-{placement}-heading">
+      <div class="exhibition-kicker">{kicker}</div>
+      {render_exhibition_subtitle(item)}
+      <h4 class="exhibition-title{(' ' + title_class) if title_class else ''}">{escape(item.get('title', ''))}</h4>
+    </div>
+    """
+
+
 def render_exhibition_upcoming(items: list[dict[str, Any]]) -> str:
     if not items:
         return ''
@@ -503,15 +524,13 @@ def render_exhibition_upcoming(items: list[dict[str, Any]]) -> str:
             """
         overview = upcoming.get('overview') or upcoming.get('theme', '')
         poster = render_dm_carousel(upcoming, upcoming.get('title', '展示会DM'))
+        kicker = 'NEXT EXHIBITION' if index == 0 else 'UPCOMING'
         cards.append(f"""
         <article class="simple-card glass-card exhibition-card upcoming-card">
-          <div class="exhibition-heading">
-            <div class="exhibition-kicker">{'NEXT EXHIBITION' if index == 0 else 'UPCOMING'}</div>
-            {render_exhibition_subtitle(upcoming)}
-            <h4 class="exhibition-title">{escape(upcoming.get('title', ''))}</h4>
-          </div>
+          {render_exhibition_heading(upcoming, kicker, 'mobile')}
           <div class="exhibition-hero{' no-poster' if not poster else ''}">
             <div class="exhibition-body">
+              {render_exhibition_heading(upcoming, kicker, 'desktop')}
               <p class="exhibition-overview">{nl2br(overview)}</p>
               {render_exhibition_meta(upcoming, include_address=True)}
               {map_embed}
@@ -638,7 +657,10 @@ def render_work_gallery(works: list[dict[str, Any]], gallery_id: str) -> str:
         render_work_card(index, {**work, '_gallery_id': gallery_id}, image_aspect(work.get('image', '')))
         for index, work in enumerate(works)
     )
-    return f'<div class="work-gallery" data-work-gallery>{cards}</div>'
+    return (
+        f'<p class="work-gallery-label">出展作品<span>{len(works)}点</span></p>'
+        f'<div class="work-gallery" data-work-gallery>{cards}</div>'
+    )
 
 
 def render_exhibition_recent(recent: dict[str, Any] | None) -> str:
@@ -651,13 +673,10 @@ def render_exhibition_recent(recent: dict[str, Any] | None) -> str:
     poster = render_dm_carousel(recent, recent.get('title', '展示会DM'))
     return f"""
     <article class="simple-card glass-card exhibition-card recent-card">
-      <div class="exhibition-heading">
-        <div class="exhibition-kicker">RECENT EXHIBITION</div>
-        {render_exhibition_subtitle(recent)}
-        <h4 class="exhibition-title">{escape(recent.get('title', ''))}</h4>
-      </div>
+      {render_exhibition_heading(recent, 'RECENT EXHIBITION', 'mobile')}
       <div class="exhibition-hero{' no-poster' if not poster else ''}">
         <div class="exhibition-body">
+          {render_exhibition_heading(recent, 'RECENT EXHIBITION', 'desktop')}
           <p class="exhibition-overview">{nl2br(overview)}</p>
           {render_exhibition_meta(recent, include_address=True)}
         </div>
@@ -684,18 +703,10 @@ def render_exhibition_archive(items: list[dict[str, Any]]) -> str:
         cards.append(
             f"""
             <article class="simple-card glass-card exhibition-card archive-card">
-              <div class="archive-mobile-heading">
-                <div class="exhibition-kicker">ARCHIVE</div>
-                {render_exhibition_subtitle(item)}
-                <h4 class="exhibition-title archive-title">{escape(item.get('title', ''))}</h4>
-              </div>
+              {render_exhibition_heading(item, 'ARCHIVE', 'mobile', 'archive-title')}
               <div class="exhibition-hero archive-hero{' no-poster' if not poster else ''}">
                 <div class="exhibition-body">
-                  <div class="archive-desktop-heading">
-                    <div class="exhibition-kicker">ARCHIVE</div>
-                    {render_exhibition_subtitle(item)}
-                    <h4 class="exhibition-title archive-title">{escape(item.get('title', ''))}</h4>
-                  </div>
+                  {render_exhibition_heading(item, 'ARCHIVE', 'desktop', 'archive-title')}
                   <p class="exhibition-overview archive-overview">{nl2br(overview)}</p>
                   {'<div class="archive-actions"><a class="archive-link" href="' + escape(item.get('folder_url', '')) + '" target="_blank" rel="noopener noreferrer">Google Driveで作品を観る<i class="fa-solid fa-up-right-from-square" aria-hidden="true"></i></a></div>' if item.get('folder_url') else ''}
                   {render_exhibition_meta(item, include_address=True)}
