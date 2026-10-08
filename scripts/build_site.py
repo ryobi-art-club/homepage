@@ -340,17 +340,17 @@ def render_update_log(change_log: list[dict[str, Any]], data: dict[str, Any]) ->
 
 def render_timeline(schedule: list[dict[str, str]]) -> str:
     color_class = {
-        'yellow': 'border-yellow',
-        'blue': 'border-blue',
-        'green': 'border-green',
-        'white': 'border-white',
+        'yellow': 'dot-yellow',
+        'blue': 'dot-blue',
+        'green': 'dot-green',
+        'white': 'dot-white',
     }
     items = []
     for row in schedule:
         items.append(
             f"""
             <div class="timeline-item">
-              <div class="timeline-dot {color_class.get(row.get('accent', 'yellow'), 'border-yellow')}"></div>
+              <div class="timeline-dot {color_class.get(row.get('accent', 'yellow'), 'dot-yellow')}"></div>
               <div class="timeline-date">{escape(row.get('period', ''))}</div>
               <div class="timeline-content">{escape(row.get('label', ''))}</div>
             </div>
@@ -361,6 +361,8 @@ def render_timeline(schedule: list[dict[str, str]]) -> str:
 
 def render_info_points(points: list[dict[str, Any]]) -> str:
     cards = []
+    # 写真つきの項目は PC で左列全体を占める。右列に並ぶ項目数ぶんの行にまたがらせる
+    photo_rows = f' style="--rows: {max(1, sum(1 for point in points if not point.get("image")))};"'
     for point in points:
         link = point.get('link') or {}
         link_html = ''
@@ -372,10 +374,16 @@ def render_info_points(points: list[dict[str, Any]]) -> str:
             )
         image_html = ''
         if point.get('image'):
-            image_html = f'<img class="info-point-photo" src="{escape(point["image"])}" alt="{escape(point.get("label", ""))}" loading="lazy">'
+            label = escape(point.get('label', ''))
+            image_html = (
+                f'<button class="info-point-photo-button" type="button" data-lightbox-gallery="info-{label}" '
+                f'data-lightbox-index="0" data-lightbox-caption="{label}" aria-label="{label}の写真を拡大">'
+                f'<img class="info-point-photo" src="{escape(point["image"])}" alt="{label}" loading="lazy">'
+                '</button>'
+            )
         cards.append(
             f"""
-            <article class="info-point{' has-photo' if image_html else ''}">
+            <article class="info-point{' has-photo' if image_html else ''}"{photo_rows if image_html else ''}>
               <div class="info-point-label">{escape(point.get('label', ''))}</div>
               <div class="info-point-text">{rich_text(point.get('text', ''))}</div>
               {image_html}
@@ -398,11 +406,13 @@ def render_material_chips(materials: list[Any]) -> str:
         if note:
             chips.append(
                 f'<button class="material-chip has-note" type="button" data-name="{escape(name)}" data-note="{escape(note)}" aria-expanded="false">'
-                f'{escape(name)}<i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>'
+                f'{escape(name)}</button>'
             )
         else:
             chips.append(f'<span>{escape(name)}</span>')
-    note_area = '<p class="material-note" id="materialNote" hidden></p>'
+    hint = '気になる画材を押すと、説明が表示されます。'
+    note_area = f'<p class="material-note is-hint" id="materialNote" data-hint="{hint}" aria-live="polite">{hint}</p>' if any(isinstance(m, dict) and m.get('note') for m in materials) else ''
+
     return f'<div class="material-chip-grid">{"".join(chips)}</div>{note_area}'
 
 
@@ -413,16 +423,19 @@ def render_activity_cards(items: list[dict[str, Any]]) -> str:
     ordered = sorted(items, key=lambda x: x.get('created_at', ''), reverse=True)
     cards = []
     for item in ordered:
+        images = render_image_grid(item.get('images', []), item.get('title', '活動記録・告知'), 'activity-' + str(item.get('id', '')))
         cards.append(
             f"""
-            <article class="article-card">
-              <div class="article-meta">
-                <span>{escape(activity_category_label(item.get('category', 'record')))}</span>
-                <time datetime="{escape(item.get('created_at', ''))}">{fmt_date(item.get('created_at', ''))}</time>
+            <article class="article-card{' has-images' if images else ''}">
+              <div class="article-text">
+                <div class="article-meta">
+                  <span>{escape(activity_category_label(item.get('category', 'record')))}</span>
+                  <time datetime="{escape(item.get('created_at', ''))}">{fmt_date(item.get('created_at', ''))}</time>
+                </div>
+                <h4 class="article-title">{escape(item.get('title', ''))}</h4>
+                <p class="article-body">{nl2br(item.get('body', ''))}</p>
               </div>
-              <h4 class="article-title">{escape(item.get('title', ''))}</h4>
-              <p class="article-body">{nl2br(item.get('body', ''))}</p>
-              {render_image_grid(item.get('images', []), item.get('title', '活動記録・告知'), 'activity-' + str(item.get('id', '')))}
+              {images}
             </article>
             """
         )
@@ -435,13 +448,16 @@ def render_request_cards(items: list[dict[str, Any]]) -> str:
     ordered = sorted(items, key=lambda x: int(x.get('sort_order', 9999)))
     cards = []
     for item in ordered:
+        images = render_image_grid(item.get('images', []), item.get('title', '取り組み事例'), 'request-' + str(item.get('id', '')))
         cards.append(
             f"""
-            <article class="request-card">
-              <div class="request-meta"><span>過去の取り組み事例</span></div>
-              <h4 class="request-title">{escape(item.get('title', ''))}</h4>
-              <p class="request-body">{nl2br(item.get('body', ''))}</p>
-              {render_image_grid(item.get('images', []), item.get('title', '取り組み事例'), 'request-' + str(item.get('id', '')))}
+            <article class="request-card{' has-images' if images else ''}">
+              <div class="article-text">
+                <div class="request-meta"><span>過去の取り組み事例</span></div>
+                <h4 class="request-title">{escape(item.get('title', ''))}</h4>
+                <p class="request-body">{nl2br(item.get('body', ''))}</p>
+              </div>
+              {images}
             </article>
             """
         )
@@ -489,6 +505,19 @@ def render_exhibition_subtitle(item: dict[str, Any]) -> str:
     return f'<div class="exhibition-subtitle">{escape(subtitle)}</div>'
 
 
+def render_exhibition_heading(item: dict[str, Any], kicker: str, placement: str, title_class: str = '') -> str:
+    """展示会カードの見出し。PC では本文列の中(placement='desktop')に置いて DM と横に並べ、
+    スマホではカードの先頭(placement='mobile')に出して「見出し→DM→本文」の順にする。
+    どちらも出力し、表示の切り替えは CSS で行う。"""
+    return f"""
+    <div class="exhibition-heading exhibition-{placement}-heading">
+      <div class="exhibition-kicker">{kicker}</div>
+      {render_exhibition_subtitle(item)}
+      <h4 class="exhibition-title{(' ' + title_class) if title_class else ''}">{escape(item.get('title', ''))}</h4>
+    </div>
+    """
+
+
 def render_exhibition_upcoming(items: list[dict[str, Any]]) -> str:
     if not items:
         return ''
@@ -503,15 +532,13 @@ def render_exhibition_upcoming(items: list[dict[str, Any]]) -> str:
             """
         overview = upcoming.get('overview') or upcoming.get('theme', '')
         poster = render_dm_carousel(upcoming, upcoming.get('title', '展示会DM'))
+        kicker = 'NEXT EXHIBITION' if index == 0 else 'UPCOMING'
         cards.append(f"""
         <article class="simple-card glass-card exhibition-card upcoming-card">
-          <div class="exhibition-heading">
-            <div class="exhibition-kicker">{'NEXT EXHIBITION' if index == 0 else 'UPCOMING'}</div>
-            {render_exhibition_subtitle(upcoming)}
-            <h4 class="exhibition-title">{escape(upcoming.get('title', ''))}</h4>
-          </div>
+          {render_exhibition_heading(upcoming, kicker, 'mobile')}
           <div class="exhibition-hero{' no-poster' if not poster else ''}">
             <div class="exhibition-body">
+              {render_exhibition_heading(upcoming, kicker, 'desktop')}
               <p class="exhibition-overview">{nl2br(overview)}</p>
               {render_exhibition_meta(upcoming, include_address=True)}
               {map_embed}
@@ -613,11 +640,12 @@ def image_aspect(src: str) -> float:
     return max(0.35, min(3.2, ratio))
 
 
-def render_work_card(index: int, work: dict[str, Any], ratio: float, extra_class: str = '') -> str:
+def render_work_card(index: int, work: dict[str, Any], ratio: float) -> str:
     caption = (work.get('title', '作品画像') or '') + ((' / ' + work.get('artist', '')) if work.get('artist') else '')
-    classes = 'work-card' + (f' {extra_class}' if extra_class else '')
+    # 行方式の幅の比率。極端な縦長・横長だけ枠の比率を丸め、画像は枠内に contain で収める
+    layout_ratio = min(max(ratio, 0.4), 3.0)
     return f'''
-      <article class="{classes}" data-work-card data-aspect="{ratio:.4f}" style="--work-order: {index};">
+      <article class="work-card" data-work-card data-aspect="{ratio:.4f}" style="--ratio: {layout_ratio:.4f};">
         <button class="work-image-button" type="button" data-lightbox-gallery="{escape(work.get('_gallery_id', 'recent-works'))}" data-lightbox-index="{index}" data-lightbox-caption="{escape(caption)}" aria-label="{escape(work.get('title', '作品画像'))}を拡大">
           <img src="{escape(work.get('image', ''))}" alt="{escape(work.get('title', '作品画像'))}" loading="lazy">
         </button>
@@ -629,68 +657,17 @@ def render_work_card(index: int, work: dict[str, Any], ratio: float, extra_class
 
 
 def render_work_gallery(works: list[dict[str, Any]], gallery_id: str) -> str:
+    """作品を登録順のまま行方式で並べる。各行の高さを揃え、幅は縦横比に比例させる
+    (行の折り返しはブラウザが行う。stylesheet.css の .work-gallery を参照)。"""
     if not works:
         return ''
-
-    enriched: list[dict[str, Any]] = []
-    for index, work in enumerate(works):
-        copied = dict(work)
-        ratio = image_aspect(copied.get('image', ''))
-        copied['_index'] = index
-        copied['_ratio'] = ratio
-        copied['_gallery_id'] = gallery_id
-        copied['_height_score'] = 1.0 / max(ratio, 0.35)
-        enriched.append(copied)
-
-    # 横幅が縦幅の2倍以上ある作品は、展示カード幅を活かすため上段で2列分を使う。
-    panoramas = [work for work in enriched if work['_ratio'] >= 2.0]
-    remaining = [work for work in enriched if work['_ratio'] < 2.0]
-
-    # 残りは順序入れ替え可。高さ差が最小になる2列分割をビルド時に探索する。
-    # 作品数は通常少数なので、完全探索で左右差を最小化する。多すぎる場合のみLPTへフォールバック。
-    scores = [work['_height_score'] + 0.12 for work in remaining]
-    columns: list[list[dict[str, Any]]] = [[], []]
-    if remaining and len(remaining) <= 18:
-        total = sum(scores)
-        best_mask = 0
-        best_diff = float('inf')
-        for mask in range(1 << len(remaining)):
-            left = sum(scores[i] for i in range(len(remaining)) if mask & (1 << i))
-            diff = abs(total - 2 * left)
-            if diff < best_diff:
-                best_diff = diff
-                best_mask = mask
-        columns = [
-            [work for i, work in enumerate(remaining) if best_mask & (1 << i)],
-            [work for i, work in enumerate(remaining) if not (best_mask & (1 << i))]
-        ]
-        columns[0].sort(key=lambda work: work['_height_score'], reverse=True)
-        columns[1].sort(key=lambda work: work['_height_score'], reverse=True)
-    else:
-        remaining.sort(key=lambda work: work['_height_score'], reverse=True)
-        heights = [0.0, 0.0]
-        for work in remaining:
-            target = 0 if heights[0] <= heights[1] else 1
-            columns[target].append(work)
-            heights[target] += work['_height_score'] + 0.12
-
-    full_html = ''.join(
-        render_work_card(work['_index'], work, work['_ratio'], 'is-full')
-        for work in panoramas
+    cards = ''.join(
+        render_work_card(index, {**work, '_gallery_id': gallery_id}, image_aspect(work.get('image', '')))
+        for index, work in enumerate(works)
     )
-    column_html = []
-    for column in columns:
-        cards = ''.join(
-            render_work_card(work['_index'], work, work['_ratio'])
-            for work in column
-        )
-        column_html.append(f'<div class="work-column">{cards}</div>')
-
     return (
-        '<div class="work-gallery work-gallery-balanced" data-work-gallery>'
-        f'<div class="work-full">{full_html}</div>'
-        f'<div class="work-columns">{"".join(column_html)}</div>'
-        '</div>'
+        f'<p class="work-gallery-label">出展作品<span>{len(works)}点</span></p>'
+        f'<div class="work-gallery" data-work-gallery>{cards}</div>'
     )
 
 
@@ -704,13 +681,10 @@ def render_exhibition_recent(recent: dict[str, Any] | None) -> str:
     poster = render_dm_carousel(recent, recent.get('title', '展示会DM'))
     return f"""
     <article class="simple-card glass-card exhibition-card recent-card">
-      <div class="exhibition-heading">
-        <div class="exhibition-kicker">RECENT EXHIBITION</div>
-        {render_exhibition_subtitle(recent)}
-        <h4 class="exhibition-title">{escape(recent.get('title', ''))}</h4>
-      </div>
+      {render_exhibition_heading(recent, 'RECENT EXHIBITION', 'mobile')}
       <div class="exhibition-hero{' no-poster' if not poster else ''}">
         <div class="exhibition-body">
+          {render_exhibition_heading(recent, 'RECENT EXHIBITION', 'desktop')}
           <p class="exhibition-overview">{nl2br(overview)}</p>
           {render_exhibition_meta(recent, include_address=True)}
         </div>
@@ -737,21 +711,13 @@ def render_exhibition_archive(items: list[dict[str, Any]]) -> str:
         cards.append(
             f"""
             <article class="simple-card glass-card exhibition-card archive-card">
-              <div class="archive-mobile-heading">
-                <div class="exhibition-kicker">ARCHIVE</div>
-                {render_exhibition_subtitle(item)}
-                <h4 class="exhibition-title archive-title">{escape(item.get('title', ''))}</h4>
-              </div>
+              {render_exhibition_heading(item, 'ARCHIVE', 'mobile', 'archive-title')}
               <div class="exhibition-hero archive-hero{' no-poster' if not poster else ''}">
                 <div class="exhibition-body">
-                  <div class="archive-desktop-heading">
-                    <div class="exhibition-kicker">ARCHIVE</div>
-                    {render_exhibition_subtitle(item)}
-                    <h4 class="exhibition-title archive-title">{escape(item.get('title', ''))}</h4>
-                  </div>
+                  {render_exhibition_heading(item, 'ARCHIVE', 'desktop', 'archive-title')}
                   <p class="exhibition-overview archive-overview">{nl2br(overview)}</p>
+                  {'<div class="archive-actions"><a class="archive-link" href="' + escape(item.get('folder_url', '')) + '" target="_blank" rel="noopener noreferrer">Google Driveで作品を観る<i class="fa-solid fa-up-right-from-square" aria-hidden="true"></i></a></div>' if item.get('folder_url') else ''}
                   {render_exhibition_meta(item, include_address=True)}
-                  {'<div class="archive-actions"><a class="archive-link" href="' + escape(item.get('folder_url', '')) + '" target="_blank" rel="noopener noreferrer">Google Driveで見る <i class="fa-solid fa-up-right-from-square"></i></a></div>' if item.get('folder_url') else ''}
                 </div>
                 {poster}
               </div>
@@ -846,6 +812,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
   <script defer src="site.js"></script>
 </head>
 <body>
+  <div class="ink-layer" data-ink-layer aria-hidden="true"></div>
   <nav class="global-nav">
     <div class="nav-container">
       <a href="#home" class="nav-brand">
@@ -904,8 +871,6 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
             {render_exhibition_upcoming(upcoming_items)}
             {render_exhibition_recent(recent)}
             <article class="simple-card glass-card">
-              <p class="eyebrow">ARCHIVE</p>
-              <h4 style="font-size:1.28rem; margin-bottom: 12px;">展示会アーカイブ</h4>
               {render_exhibition_archive(archive_rest)}
             </article>
           </div>
@@ -932,13 +897,11 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
             <h4 style="font-size:1.28rem;">使えるもの</h4>
             {render_material_chips(recruit['materials'])}
           </div>
-          <div style="height: 18px;"></div>
           <div class="simple-card glass-card">
             <p class="eyebrow">ANNUAL SCHEDULE</p>
             <h4 style="font-size:1.28rem;">年間スケジュール</h4>
             {render_timeline(recruit['annual_schedule'])}
           </div>
-          <div style="height: 18px;"></div>
           <div class="simple-card glass-card">
             <p class="eyebrow">WELCOME CALENDAR</p>
             <h4 style="font-size:1.28rem;">{escape(data.get('recruit_calendar', {}).get('label', '新歓イベントカレンダー'))}</h4>
@@ -952,7 +915,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
             <h3 class="section-title" style="font-size: clamp(1.6rem, 3vw, 2.3rem);">ご依頼の方へ</h3>
             <p class="section-subtitle">{rich_text(requests_static['summary'])}</p>
           </div>
-          <div class="simple-card glass-card request-contact-card" style="margin-bottom: 18px;">
+          <div class="simple-card glass-card request-contact-card">
             <p class="request-contact-heading">お問い合わせ先</p>
             <ul class="request-contact-list">
               <li><span>Email</span><a href="mailto:{escape(requests_static['contact_email'])}">{escape(requests_static['contact_email'])}</a></li>
