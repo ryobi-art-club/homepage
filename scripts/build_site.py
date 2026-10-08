@@ -613,11 +613,12 @@ def image_aspect(src: str) -> float:
     return max(0.35, min(3.2, ratio))
 
 
-def render_work_card(index: int, work: dict[str, Any], ratio: float, extra_class: str = '') -> str:
+def render_work_card(index: int, work: dict[str, Any], ratio: float) -> str:
     caption = (work.get('title', '作品画像') or '') + ((' / ' + work.get('artist', '')) if work.get('artist') else '')
-    classes = 'work-card' + (f' {extra_class}' if extra_class else '')
+    # 行方式の幅の比率。極端な縦長・横長だけ枠の比率を丸め、画像は枠内に contain で収める
+    layout_ratio = min(max(ratio, 0.4), 3.0)
     return f'''
-      <article class="{classes}" data-work-card data-aspect="{ratio:.4f}" style="--work-order: {index};">
+      <article class="work-card" data-work-card data-aspect="{ratio:.4f}" style="--ratio: {layout_ratio:.4f};">
         <button class="work-image-button" type="button" data-lightbox-gallery="{escape(work.get('_gallery_id', 'recent-works'))}" data-lightbox-index="{index}" data-lightbox-caption="{escape(caption)}" aria-label="{escape(work.get('title', '作品画像'))}を拡大">
           <img src="{escape(work.get('image', ''))}" alt="{escape(work.get('title', '作品画像'))}" loading="lazy">
         </button>
@@ -629,69 +630,15 @@ def render_work_card(index: int, work: dict[str, Any], ratio: float, extra_class
 
 
 def render_work_gallery(works: list[dict[str, Any]], gallery_id: str) -> str:
+    """作品を登録順のまま行方式で並べる。各行の高さを揃え、幅は縦横比に比例させる
+    (行の折り返しはブラウザが行う。stylesheet.css の .work-gallery を参照)。"""
     if not works:
         return ''
-
-    enriched: list[dict[str, Any]] = []
-    for index, work in enumerate(works):
-        copied = dict(work)
-        ratio = image_aspect(copied.get('image', ''))
-        copied['_index'] = index
-        copied['_ratio'] = ratio
-        copied['_gallery_id'] = gallery_id
-        copied['_height_score'] = 1.0 / max(ratio, 0.35)
-        enriched.append(copied)
-
-    # 横幅が縦幅の2倍以上ある作品は、展示カード幅を活かすため上段で2列分を使う。
-    panoramas = [work for work in enriched if work['_ratio'] >= 2.0]
-    remaining = [work for work in enriched if work['_ratio'] < 2.0]
-
-    # 残りは順序入れ替え可。高さ差が最小になる2列分割をビルド時に探索する。
-    # 作品数は通常少数なので、完全探索で左右差を最小化する。多すぎる場合のみLPTへフォールバック。
-    scores = [work['_height_score'] + 0.12 for work in remaining]
-    columns: list[list[dict[str, Any]]] = [[], []]
-    if remaining and len(remaining) <= 18:
-        total = sum(scores)
-        best_mask = 0
-        best_diff = float('inf')
-        for mask in range(1 << len(remaining)):
-            left = sum(scores[i] for i in range(len(remaining)) if mask & (1 << i))
-            diff = abs(total - 2 * left)
-            if diff < best_diff:
-                best_diff = diff
-                best_mask = mask
-        columns = [
-            [work for i, work in enumerate(remaining) if best_mask & (1 << i)],
-            [work for i, work in enumerate(remaining) if not (best_mask & (1 << i))]
-        ]
-        columns[0].sort(key=lambda work: work['_height_score'], reverse=True)
-        columns[1].sort(key=lambda work: work['_height_score'], reverse=True)
-    else:
-        remaining.sort(key=lambda work: work['_height_score'], reverse=True)
-        heights = [0.0, 0.0]
-        for work in remaining:
-            target = 0 if heights[0] <= heights[1] else 1
-            columns[target].append(work)
-            heights[target] += work['_height_score'] + 0.12
-
-    full_html = ''.join(
-        render_work_card(work['_index'], work, work['_ratio'], 'is-full')
-        for work in panoramas
+    cards = ''.join(
+        render_work_card(index, {**work, '_gallery_id': gallery_id}, image_aspect(work.get('image', '')))
+        for index, work in enumerate(works)
     )
-    column_html = []
-    for column in columns:
-        cards = ''.join(
-            render_work_card(work['_index'], work, work['_ratio'])
-            for work in column
-        )
-        column_html.append(f'<div class="work-column">{cards}</div>')
-
-    return (
-        '<div class="work-gallery work-gallery-balanced" data-work-gallery>'
-        f'<div class="work-full">{full_html}</div>'
-        f'<div class="work-columns">{"".join(column_html)}</div>'
-        '</div>'
-    )
+    return f'<div class="work-gallery" data-work-gallery>{cards}</div>'
 
 
 def render_exhibition_recent(recent: dict[str, Any] | None) -> str:
@@ -750,8 +697,8 @@ def render_exhibition_archive(items: list[dict[str, Any]]) -> str:
                     <h4 class="exhibition-title archive-title">{escape(item.get('title', ''))}</h4>
                   </div>
                   <p class="exhibition-overview archive-overview">{nl2br(overview)}</p>
+                  {'<div class="archive-actions"><a class="archive-link" href="' + escape(item.get('folder_url', '')) + '" target="_blank" rel="noopener noreferrer">Google Driveで作品を観る<i class="fa-solid fa-up-right-from-square" aria-hidden="true"></i></a></div>' if item.get('folder_url') else ''}
                   {render_exhibition_meta(item, include_address=True)}
-                  {'<div class="archive-actions"><a class="archive-link" href="' + escape(item.get('folder_url', '')) + '" target="_blank" rel="noopener noreferrer">Google Driveで見る <i class="fa-solid fa-up-right-from-square"></i></a></div>' if item.get('folder_url') else ''}
                 </div>
                 {poster}
               </div>
@@ -904,8 +851,6 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
             {render_exhibition_upcoming(upcoming_items)}
             {render_exhibition_recent(recent)}
             <article class="simple-card glass-card">
-              <p class="eyebrow">ARCHIVE</p>
-              <h4 style="font-size:1.28rem; margin-bottom: 12px;">展示会アーカイブ</h4>
               {render_exhibition_archive(archive_rest)}
             </article>
           </div>
@@ -932,13 +877,11 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
             <h4 style="font-size:1.28rem;">使えるもの</h4>
             {render_material_chips(recruit['materials'])}
           </div>
-          <div style="height: 18px;"></div>
           <div class="simple-card glass-card">
             <p class="eyebrow">ANNUAL SCHEDULE</p>
             <h4 style="font-size:1.28rem;">年間スケジュール</h4>
             {render_timeline(recruit['annual_schedule'])}
           </div>
-          <div style="height: 18px;"></div>
           <div class="simple-card glass-card">
             <p class="eyebrow">WELCOME CALENDAR</p>
             <h4 style="font-size:1.28rem;">{escape(data.get('recruit_calendar', {}).get('label', '新歓イベントカレンダー'))}</h4>
@@ -952,7 +895,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
             <h3 class="section-title" style="font-size: clamp(1.6rem, 3vw, 2.3rem);">ご依頼の方へ</h3>
             <p class="section-subtitle">{rich_text(requests_static['summary'])}</p>
           </div>
-          <div class="simple-card glass-card request-contact-card" style="margin-bottom: 18px;">
+          <div class="simple-card glass-card request-contact-card">
             <p class="request-contact-heading">お問い合わせ先</p>
             <ul class="request-contact-list">
               <li><span>Email</span><a href="mailto:{escape(requests_static['contact_email'])}">{escape(requests_static['contact_email'])}</a></li>
