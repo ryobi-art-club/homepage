@@ -536,30 +536,34 @@ a { color: inherit; }
 .material-chip-grid .material-chip {
   font-family: inherit;
   cursor: pointer;
-  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+  transition: background 0.25s ease, color 0.25s ease;
 }
-.material-chip .fa-circle-info {
-  margin-left: 8px;
-  font-size: 0.82em;
-  color: rgba(255,255,255,0.38);
-  transition: color 0.25s ease;
+/* 選択中はタブと同じ生成り色の面に黒文字 */
+.material-chip-grid .material-chip.is-active {
+  background: var(--color-paper);
+  color: var(--color-black);
 }
-.material-chip.is-active {
-  background: rgba(255,255,255,0.12);
-  border-color: rgba(255,255,255,0.30);
-  color: var(--color-white);
-}
-.material-chip.is-active .fa-circle-info { color: rgba(255,255,255,0.85); }
+/* 説明の場所は常に確保しておき、未選択時は案内文を薄く出す。
+   アイコンなしでも押せると分かり、説明の表示でページが伸び縮みしない */
 .material-note {
-  margin-top: 14px;
-  padding: 12px 16px;
-  border-radius: 0 14px 14px 0;
-  background: rgba(255,255,255,0.05);
-  border-left: 3px solid rgba(150,180,255,0.45);
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--divider);
+  min-height: 4.4em;
   color: var(--text-soft);
   font-size: 0.95rem;
 }
-.material-note strong { color: var(--color-white); }
+.material-note strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--color-white);
+}
+.material-note.is-hint { color: var(--text-muted); }
+.material-note.is-changing { animation: material-note-in 0.3s ease; }
+@keyframes material-note-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
 .timeline {
   position: relative;
   padding: 28px 0 12px;
@@ -1261,16 +1265,15 @@ footer {
     background: rgba(246,217,38,0.14);
     border-color: rgba(246,217,38,0.34);
   }
-  .material-chip.has-note:hover {
-    background: rgba(255,255,255,0.10);
-    border-color: rgba(255,255,255,0.26);
+  .material-chip.has-note:not(.is-active):hover {
+    background: rgba(255,255,255,0.14);
     color: var(--color-white);
   }
-  .material-chip.has-note:hover .fa-circle-info { color: rgba(255,255,255,0.75); }
 }
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; transition: none; }
   .tab-panel.is-active { animation: none; }
+  .material-note.is-changing { animation: none; }
   .hero-logo, .circle-green, .square-blue { animation: none; }
   .hero-slide { transition: none; }
   .hero-slide img { transform: none; }

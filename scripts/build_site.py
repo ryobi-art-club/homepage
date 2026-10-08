@@ -406,11 +406,13 @@ def render_material_chips(materials: list[Any]) -> str:
         if note:
             chips.append(
                 f'<button class="material-chip has-note" type="button" data-name="{escape(name)}" data-note="{escape(note)}" aria-expanded="false">'
-                f'{escape(name)}<i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>'
+                f'{escape(name)}</button>'
             )
         else:
             chips.append(f'<span>{escape(name)}</span>')
-    note_area = '<p class="material-note" id="materialNote" hidden></p>'
+    hint = '気になる画材を押すと、説明が表示されます。'
+    note_area = f'<p class="material-note is-hint" id="materialNote" data-hint="{hint}" aria-live="polite">{hint}</p>' if any(isinstance(m, dict) and m.get('note') for m in materials) else ''
+
     return f'<div class="material-chip-grid">{"".join(chips)}</div>{note_area}'
 
 

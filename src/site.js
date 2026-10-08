@@ -89,17 +89,24 @@
     var chips = Array.from(document.querySelectorAll('.material-chip.has-note'));
     var stickyChip = null;
 
+    var shown = null;
+    // 未選択時は案内文を出す。表示が切り替わるときだけ軽くフェードさせる
     function renderNote(chip) {
+      if (chip === shown) return;
+      shown = chip;
       note.textContent = '';
+      note.classList.toggle('is-hint', !chip);
       if (!chip) {
-        note.hidden = true;
-        return;
+        note.textContent = note.getAttribute('data-hint') || '';
+      } else {
+        var name = document.createElement('strong');
+        name.textContent = chip.getAttribute('data-name') || '';
+        note.appendChild(name);
+        note.appendChild(document.createTextNode(chip.getAttribute('data-note') || ''));
       }
-      var name = document.createElement('strong');
-      name.textContent = chip.getAttribute('data-name') || '';
-      note.appendChild(name);
-      note.appendChild(document.createTextNode('　' + (chip.getAttribute('data-note') || '')));
-      note.hidden = false;
+      note.classList.remove('is-changing');
+      void note.offsetWidth;
+      note.classList.add('is-changing');
     }
     function setSticky(chip) {
       stickyChip = chip;
