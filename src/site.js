@@ -4,6 +4,11 @@
     return String(value).replace(/[^a-zA-Z0-9_-]/g, function(ch) { return '\\' + ch; });
   }
   function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[ch];
+    });
+  }
 
   var Lightbox = {
     openTrigger: function() {}
@@ -189,7 +194,7 @@
 
     function buildSlides() {
       track.innerHTML = state.items.map(function(item) {
-        return '<div class="lightbox-slide"><img src="' + item.src + '" alt="' + (item.alt || '') + '" draggable="false"></div>';
+        return '<div class="lightbox-slide"><img src="' + escapeHtml(item.src) + '" alt="' + escapeHtml(item.alt) + '" draggable="false"></div>';
       }).join('');
     }
 

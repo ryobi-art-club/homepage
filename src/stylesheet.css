@@ -405,7 +405,6 @@ a { color: inherit; }
 .update-log-item:last-of-type { padding-bottom: 0; }
 .update-log-item + .update-log-item { border-top: 1px solid var(--divider); }
 .update-log-date { font-size: 0.82rem; color: var(--text-muted); letter-spacing: 0.08em; }
-.update-log-text { color: rgba(255,255,255,0.92); }
 .update-log-bullets { list-style: none; display: grid; gap: 8px; }
 .update-log-bullets li { color: rgba(255,255,255,0.92); padding-left: 1.1em; position: relative; }
 .update-log-bullets li::before { content: "・"; position: absolute; left: 0; color: var(--color-yellow); }
@@ -735,7 +734,6 @@ a { color: inherit; }
 .upcoming-list { display: grid; }
 .exhibition-heading { margin-bottom: 18px; }
 /* 見出しは PC では本文列の中、スマホではカード先頭に出す(build_site.py の render_exhibition_heading) */
-.exhibition-mobile-heading { display: none; }
 /* 行の上下の余白を削って、文字の上端を箱の上端に合わせる。
    横に並ぶDMの上端と文字の上端が揃い、DMがはみ出して見えないようにするため。
    text-box 未対応のブラウザでも line-height: 1 でほぼ揃う */
@@ -1377,9 +1375,7 @@ footer {
     margin: 0 auto 18px;
   }
 
-  /* 展示会カード: 見出しをカード先頭に出し、DM→本文の順にする */
-  .exhibition-mobile-heading { display: block; margin-bottom: 16px; }
-  .exhibition-desktop-heading { display: none; }
+  /* 展示会カード: DM→本文の順にする */
   .archive-hero .dm-poster-wrap {
     order: 1;
     justify-self: center;
