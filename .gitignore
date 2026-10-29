@@ -1,1 +1,6 @@
 scripts/__pycache__
+build/
+dist/
+# Never commit Google credentials
+*service-account*.json
+*-key.json
