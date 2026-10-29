@@ -1,502 +1,245 @@
-# homepage — 開発者向けドキュメント
+# 凌美会ホームページ 公開サイト（homepage）
 
-凌美会公式ホームページの**静的サイトジェネレーター**です。  
-Google スプレッドシートのデータと Google Drive の画像を取得して、静的 HTML ファイルを生成し GitHub Pages で公開します。
+凌美会の公開サイト（<https://ryobi-art-club.github.io/homepage/>）を作るリポジトリです。管理画面で保存された内容（Google スプレッドシートと Drive）を読み、HTML を作って GitHub Pages で公開します。
 
----
+**システム全体の説明・アカウント・運用・トラブルシュートは、管理画面のリポジトリ [homepage-cms の README](https://github.com/ryobi-art-club/homepage-cms) にまとめています。まずそちらを読んでください。** この資料は、公開サイトだけに関わることを書いています。
+
+AI エージェントに作業を頼むときの決まりごとは [`AGENTS.md`](AGENTS.md) にあります。
 
 ## 目次
 
-1. [システム全体の流れ](#1-システム全体の流れ)
-2. [ファイル構成](#2-ファイル構成)
-3. [各ファイルの詳細](#3-各ファイルの詳細)
-4. [ビルドパイプライン詳細](#4-ビルドパイプライン詳細)
-5. [静的コンテンツの管理](#5-静的コンテンツの管理)
-6. [セットアップ手順](#6-セットアップ手順)
-7. [ローカルビルド手順](#7-ローカルビルド手順)
-8. [GitHub Actions のシークレット設定](#8-github-actions-のシークレット設定)
-9. [ページ構成・UI 仕様](#9-ページ構成ui-仕様)
+1. [サイトの作られ方](#1-サイトの作られ方)
+2. [固定の文章や画像を変えるとき](#2-固定の文章や画像を変えるとき)
+3. [デザインや動きを変えるとき](#3-デザインや動きを変えるとき)
+4. [手元でのビルドと確認](#4-手元でのビルドと確認)
+5. [GitHub Actions とシークレット](#5-github-actions-とシークレット)
+6. [ページの構成と表示の決まり](#6-ページの構成と表示の決まり)
+7. [定期的な点検](#7-定期的な点検)
+8. [ファイルごとの詳細](#8-ファイルごとの詳細)
+9. [一から作り直すときのセットアップ手順](#9-一から作り直すときのセットアップ手順)
 
 ---
 
-## 1. システム全体の流れ
+## 1. サイトの作られ方
 
 ```
-GitHub Actions（workflow_dispatch で起動）
-    │
-    ├── Step 1: fetch_google_content.py
-    │         Google スプレッドシート → content_snapshot.json
-    │         Google Drive → assets/ （画像ダウンロード）
-    │
-    └── Step 2: build_site.py
-              site_static.json + content_snapshot.json + assets/
-              → dist/ （index.html, stylesheet.css, site.js, logo.png, assets/, sitemap.xml）
-                   │
-                   └── GitHub Pages へ自動デプロイ
-```
-
-ビルドの起動は **homepage-cms の「公開する」ボタン** からトリガーされます（GitHub Actions の `workflow_dispatch` API 経由）。
-
----
-
-## 2. ファイル構成
-
-```
-homepage/
-├── requirements.txt              Python 依存パッケージ
-├── .github/
-│   └── workflows/
-│       └── deploy.yml            GitHub Actions ワークフロー定義
-│
-└── scripts/
-│   ├── fetch_google_content.py   Step 1: Sheets/Drive → JSON スナップショット
-│   └── build_site.py             Step 2: JSON → 静的 HTML ビルド
-│
-└── src/
-    ├── site_static.json          静的コンテンツ設定（クラブ情報・固定テキスト）
-    ├── stylesheet.css            サイトのスタイルシート
-    ├── site.js                   フロントエンド JavaScript
-    ├── logo.png                  クラブロゴ
-    └── verification/
-        ├── google0b9354aae6210dec.html  Google Search Console 認証ファイル
-        └── google6b8499ef8e62e774.html  同上
-```
-
----
-
-## 3. 各ファイルの詳細
-
-### `scripts/fetch_google_content.py` — コンテンツ取得
-
-Google APIs から情報を取得し、後続の HTML ビルドが使いやすいフォーマット（JSON + ローカル画像ファイル）に変換します。
-
-**主な処理：**
-
-| 関数 | 役割 |
-|------|------|
-| `build_clients()` | サービスアカウント JSON から Sheets / Drive クライアントを構築 |
-| `get_sheet_rows()` | 指定シートの全行をヘッダー付き辞書リストとして取得 |
-| `normalize_recruit_calendar()` | `Recruit` シートから公開中の新歓カレンダーを取得し画像ダウンロード |
-| `normalize_activity_articles()` | `ActivityArticles` シートから公開記事を取得し画像ダウンロード |
-| `normalize_exhibitions()` | `Exhibitions` シートから展示会データを upcoming/archive に分類し画像ダウンロード |
-| `normalize_requests()` | `RequestCases` シートから依頼事例を取得し画像ダウンロード |
-| `normalize_change_log()` | `ChangeLog` シートの更新履歴を取得 |
-| `download_ordered_images_by_ids()` | `media_file_ids` の ID 順で画像をダウンロード（順番制御付き）|
-| `download_folder_images()` | フォルダ内の全画像をダウンロード（フォールバック）|
-
-**画像ダウンロード戦略：**
-1. まず `media_file_ids` の ID リストが存在すれば、その順番でダウンロード（管理画面で並び順が制御できる）
-2. なければ Drive フォルダ内の全画像をファイル名順でダウンロード
-
-**出力フォーマット（`content_snapshot.json`）：**
-
-```json
-{
-  "meta": { "generated_at": "2026-05-16T..." },
-  "recruit_calendar": {
-    "label": "2026年度 新歓イベントカレンダー",
-    "year": "2026",
-    "images": ["assets/recruit/01-calendar.jpg"]
-  },
-  "activities": [
-    {
-      "id": "activity-xxxx",
-      "title": "記事タイトル",
-      "body": "本文",
-      "category": "record",
-      "created_at": "2026-05-01T...",
-      "images": ["assets/activities/activity-xxxx/01-image.jpg"]
-    }
-  ],
-  "exhibitions": {
-    "upcoming": [...],
-    "archive": [...]
-  },
-  "requests": [...],
-  "change_log": [
-    { "timestamp": "2026-05-16T...", "summary": "展示会「〇〇展」の情報を公開" }
-  ]
-}
-```
-
-**取得するシート一覧：**
-
-| シート名 | スプレッドシート上の範囲 |
-|---------|------------------------|
-| `Recruit` | `Recruit!A1:Z2000` |
-| `ActivityArticles` | `ActivityArticles!A1:Z2000` |
-| `Exhibitions` | `Exhibitions!A1:Z2000` |
-| `RequestCases` | `RequestCases!A1:Z2000` |
-| `ChangeLog` | `ChangeLog!A1:Z2000` |
-
----
-
-### `scripts/build_site.py` — 静的サイトビルド
-
-`content_snapshot.json` と `site_static.json` を読み込み、単一の `index.html` を生成します。  
-外部テンプレートエンジンは使わず、Python の f-string で HTML を直接組み立てます。
-
-**主な関数：**
-
-| 関数 | 役割 |
-|------|------|
-| `render_page()` | ページ全体の HTML を生成するメイン関数 |
-| `build_seo_context()` | OGP / Twitter Card / JSON-LD / canonical URL などの SEO メタ情報を構築 |
-| `render_sitemap_xml()` | `sitemap.xml` を生成 |
-| `render_update_log()` | 更新履歴のリスト HTML を生成。公開中コンテンツに紐づくエントリのみ表示 |
-| `render_exhibition_upcoming()` | 開催予定展示会のカードを生成（NEXT EXHIBITION / UPCOMING バッジ付き）|
-| `render_exhibition_recent()` | 最新アーカイブ展示会のカード（作品ギャラリー付き）を生成 |
-| `render_exhibition_archive()` | 過去の展示会アーカイブリストを生成 |
-| `render_activity_cards()` | 活動記事カードを生成 |
-| `render_request_cards()` | ご依頼事例カードを生成 |
-| `render_carousel()` | 画像カルーセルの HTML を生成（新歓カレンダー・DM 画像用）|
-| `render_image_grid()` | 画像グリッド（最大 4 枚表示 + ライトボックス）を生成 |
-| `render_work_gallery()` | 展示作品ギャラリーを 2 列バランスレイアウトで生成 |
-| `render_recruit_calendar()` | 新歓カレンダーのカルーセルを生成 |
-| `render_timeline()` | 年間スケジュールのタイムラインを生成 |
-| `render_info_points()` | 部活情報（活動場所・頻度など）を生成 |
-| `image_aspect()` | 画像の縦横比を PNG/JPEG/SVG ヘッダーから取得（レイアウト最適化用）|
-
-**作品ギャラリーのレイアウトアルゴリズム（`render_work_gallery`）：**  
-縦横比が 2:1 以上のパノラマ作品は全幅で表示し、残りの作品を 2 列に高さバランスよく振り分けます。作品数が 18 枚以下の場合は全パターンを探索して最適な分割を選択、それを超える場合は LPT アルゴリズム（Longest Processing Time）にフォールバックします。
-
-**更新履歴の表示ロジック（`render_update_log`）：**  
-変更ログのエントリのうち、現在公開中のコンテンツ（記事・展示会・依頼事例）のタイトルに紐づくものだけを表示します。削除済みのコンテンツに関するログは自動的に非表示になります。
-
-**ビルド出力ファイル：**
-
-```
-dist/
-├── index.html        サイト本体
-├── stylesheet.css    スタイルシート（src/ からコピー）
-├── site.js           フロントエンド JS（src/ からコピー）
-├── logo.png          ロゴ（src/ からコピー）
-├── sitemap.xml       サイトマップ（og_url が設定されている場合のみ生成）
-├── google....html    Search Console 認証ファイル（src/verification/ からコピー）
-└── assets/           ダウンロードされた画像
-    ├── recruit/
-    ├── activities/
-    ├── exhibitions/
-    └── requests/
-```
-
----
-
-### `src/site_static.json` — 静的コンテンツ設定
-
-スプレッドシートではなく、直接 JSON を編集して更新するコンテンツです。  
-変更後は Git にコミット・push してください（GitHub Actions の次回実行時に反映されます）。
-
-**フィールド一覧：**
-
-| フィールド | 説明 |
-|-----------|------|
-| `club_name_jp` | クラブ名（日本語）|
-| `club_name_en` | クラブ名（英語）|
-| `hero_kicker` | ヒーロー画像のキャッチフレーズ（英語）|
-| `hero_title` | ヒーロー画像のメインタイトル |
-| `hero_subtitle` | ヒーロー画像のサブタイトル |
-| `og_url` | サイトの正規 URL（OGP・canonical・sitemap に使用）|
-| `og_image` | OGP 画像のパス（`logo.png` または絶対 URL）|
-| `intro_text` | About セクションの紹介文 |
-| `information_text` | INFO セクション全体のリード文 |
-| `exhibitions_static` | 展示会タブの固定コンテンツ（後述）|
-| `activities_static` | 活動記録・告知タブの固定コンテンツ（後述）|
-| `recruit_static` | 入部希望ページの固定コンテンツ（後述）|
-| `requests_static` | ご依頼ページの固定コンテンツ（後述）|
-| `social_links` | Instagram / X / Email のリンク |
-| `copyright` | フッターのコピーライト文字列 |
-
-**固定文内リンク：**
-
-本文系の固定文では、次の形式でリンクを埋め込めます。
-
-```text
-[表示テキスト](https://example.com)
-```
-
-対象は `hero_subtitle`, `intro_text`, `information_text`, `exhibitions_static.summary`, `activities_static.summary`, `recruit_static.summary`, `recruit_static.info_points[].text`, `requests_static.summary` です。タイトル、SEO メタ情報、OGP、alt、SNS URL、メールアドレスには適用しません。
-
-**`exhibitions_static` の詳細：**
-
-| フィールド | 説明 |
-|-----------|------|
-| `summary` | 展示会タブのリード文 |
-
-**`activities_static` の詳細：**
-
-| フィールド | 説明 |
-|-----------|------|
-| `summary` | 活動記録・告知タブのリード文 |
-
-**`recruit_static` の詳細：**
-
-| フィールド | 説明 |
-|-----------|------|
-| `headline` | セクション見出し |
-| `summary` | リード文 |
-| `info_points` | 基本情報リスト（`label` + `text`の配列）|
-| `materials` | 使用可能な材料・道具のリスト |
-| `annual_schedule` | 年間スケジュール（`period` + `label` + `accent` の配列）|
-
-`annual_schedule` の `accent` には `yellow` / `blue` / `green` / `white` が指定可能です。
-
-**`requests_static` の詳細：**
-
-| フィールド | 説明 |
-|-----------|------|
-| `summary` | リード文 |
-| `contact_email` | 問い合わせメールアドレス |
-| `contact_instagram` | Instagram アカウント名 |
-| `contact_x` | X（旧 Twitter）アカウント名 |
-
----
-
-### `src/site.js` — フロントエンド JavaScript
-
-**機能：**
-
-| 機能 | 実装 |
-|------|------|
-| タブ切替 | `[data-tab-shell]` / `[data-tab-target]` / `[data-tab-panel]` 属性で制御 |
-| ライトボックス | 画像クリックでオーバーレイ表示。ドラッグ・矢印キー・ESC キー対応 |
-| 画像カルーセル | スワイプ・ドラッグ対応のスライダー。カルーセル内画像をクリックするとライトボックスが開く |
-| 画像グリッドのレイアウト調整 | プライマリ画像の縦横比を `naturalWidth/Height` で取得し CSS クラスを付与 |
-
-外部ライブラリは使用せず、バニラ JavaScript のみです。
-
----
-
-### `src/stylesheet.css` — スタイルシート
-
-CSS 変数（カスタムプロパティ）ベースのデザインシステムです。  
-カラーパレット・タイポグラフィ・レスポンシブ対応はすべてここで定義されています。
-
----
-
-### `.github/workflows/deploy.yml` — GitHub Actions ワークフロー
-
-`workflow_dispatch` イベントのみで起動（スケジュール起動なし）。  
-手動実行または homepage-cms の公開ボタンからトリガーされます。
-
-**ジョブ構成：**
-
-| ジョブ | 処理内容 |
-|--------|---------|
-| `build` | Python 環境構築 → コンテンツ取得 → 静的サイトビルド → Pages artifact としてアップロード |
-| `deploy` | `build` の完了を待って GitHub Pages にデプロイ |
-
-**使用するシークレット：**
-
-| シークレット名 | 説明 |
-|--------------|------|
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Google API 認証用サービスアカウントの JSON キー（Drive・Sheets の読み取り権限が必要）|
-| `CONTENT_SPREADSHEET_ID` | コンテンツ用スプレッドシートの ID |
-
----
-
-## 4. ビルドパイプライン詳細
-
-```
-GitHub Actions が起動
+管理画面で「公開する」（または GitHub で手動実行）
     │
     ▼
-python fetch_google_content.py
-  --service-account-json /tmp/service-account.json
-  --content-spreadsheet-id {CONTENT_SPREADSHEET_ID}
-  --output-json build/runtime/content_snapshot.json
-  --assets-dir build/runtime/assets
+GitHub Actions（.github/workflows/deploy.yml）
     │
-    │ ① Sheets API でコンテンツデータ取得
-    │ ② Drive API で画像ファイルをダウンロード
-    │   build/runtime/assets/
-    │     ├── recruit/
-    │     ├── activities/{article_id}/
-    │     ├── exhibitions/{exhibition_id}/
-    │     └── requests/{case_id}/
-    │ ③ content_snapshot.json を出力
+    ├── ① scripts/fetch_google_content.py
+    │       スプレッドシート → build/runtime/content_snapshot.json
+    │       Drive の画像 → build/runtime/assets/
+    │       （サービスアカウントで、読み取り専用で読む）
     │
-    ▼
-python build_site.py
-  --static-config src/site_static.json
-  --content-snapshot build/runtime/content_snapshot.json
-  --assets-root build/runtime/assets
-  --output-dir dist
+    ├── ② scripts/build_site.py
+    │       src/site_static.json（固定の文章）＋ ①の結果
+    │       → dist/（index.html、CSS、JS、画像、sitemap.xml）
     │
-    │ ① site_static.json + content_snapshot.json を読み込み
-    │ ② index.html を生成（Python f-string による HTML 組み立て）
-    │ ③ sitemap.xml を生成
-    │ ④ 静的ファイルを dist/ にコピー（CSS/JS/ロゴ/認証ファイル）
-    │ ⑤ assets/ を dist/assets/ にコピー
-    │
-    ▼
-GitHub Pages にデプロイ
+    └── ③ GitHub Pages に公開
 ```
 
----
-
-## 5. 静的コンテンツの管理
-
-スプレッドシートで管理するコンテンツと、`site_static.json` で管理するコンテンツがあります。
-
-| コンテンツ | 管理方法 |
-|-----------|---------|
-| 展示会情報 | スプレッドシート（CMS で更新）|
-| 活動記事 | スプレッドシート（CMS で更新）|
-| 新歓カレンダー | スプレッドシート + Drive（CMS で更新）|
-| ご依頼事例 | スプレッドシート（CMS で更新）|
-| クラブ名・紹介文 | `site_static.json`（Git 編集 + push）|
-| 入部情報（場所・スケジュール等）| `site_static.json`（Git 編集 + push）|
-| 連絡先・SNS リンク | `site_static.json`（Git 編集 + push）|
-| コピーライト | `site_static.json`（Git 編集 + push）|
-| ロゴ画像 | `src/logo.png`（Git 編集 + push）|
-| CSS・JavaScript | `src/`（Git 編集 + push）|
-
-`site_static.json` の変更は CMS の公開ボタンを押さなくても、GitHub Actions を手動で実行するだけで反映されます。
+- **サイトは自動では作り直されません。** このリポジトリに push しただけでは反映されず、管理画面の「公開する」か、GitHub の「Actions」→「Build and Deploy Ryobi Site」→「Run workflow」で作り直します。
+- ページは `index.html` の1枚だけで、タブの切り替えなどは `site.js` で行います。
 
 ---
 
-## 6. セットアップ手順
+## 2. 固定の文章や画像を変えるとき
 
-### 前提条件
-- Python 3.12 以上
-- Google Cloud プロジェクト（サービスアカウントを作成できる権限）
-- GitHub リポジトリ（GitHub Pages が有効）
+管理画面で編集できないもの（紹介文、活動場所、年間スケジュール、画材、連絡先、SNS など）は、`src/site_static.json` を直接編集します。編集したら commit・push し、上の方法でサイトを作り直してください。
 
-### Step 1: Google サービスアカウントの作成
+| 内容 | 編集する場所 |
+|---|---|
+| 展示会・活動記録・新歓カレンダー・ご依頼事例 | 管理画面（このリポジトリでは編集しない） |
+| 部の名前、トップの見出し、紹介文 | `site_static.json` の `club_name_jp`、`hero_…`、`intro_text` など |
+| 各タブの説明文 | `site_static.json` の `exhibitions_static.summary` など |
+| 入部希望の方：基本情報・画材・年間スケジュール | `site_static.json` の `recruit_static` |
+| ご依頼の方：連絡先 | `site_static.json` の `requests_static` |
+| SNS のリンク、コピーライト | `site_static.json` の `social_links`、`copyright` |
+| ロゴ、部室の写真 | `src/logo.png`、`src/clubroom.jpg` |
+| デザイン・動き | `src/stylesheet.css`、`src/site.js`、`scripts/build_site.py`（[3](#3-デザインや動きを変えるとき)） |
 
-1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作成（または既存のものを使用）
-2. 「API とサービス」→「ライブラリ」で以下の API を有効化：
-   - **Google Sheets API**
-   - **Google Drive API**
-3. 「IAM と管理」→「サービスアカウント」でサービスアカウントを作成
-4. キーを作成（JSON 形式）し、ダウンロード
+### `site_static.json` の項目
 
-### Step 2: スプレッドシートへのアクセス権付与
+| 項目 | 内容 |
+|---|---|
+| `club_name_jp` / `club_name_en` | 部の名前（日本語・英語） |
+| `hero_kicker` / `hero_title` / `hero_subtitle` | トップの小見出し・見出し・説明 |
+| `og_url` | サイトの正式な URL（SNS で共有したときの表示、検索エンジン向けの情報、sitemap に使う） |
+| `og_image` | SNS で共有したときの画像（`logo.png` または URL） |
+| `intro_text` | 紹介文 |
+| `information_text` | INFORMATION の説明文 |
+| `exhibitions_static.summary` / `activities_static.summary` | 展示会・活動記録タブの説明文 |
+| `recruit_static` | 入部希望の方タブ。`headline`（見出し）、`summary`（説明）、`info_points`（基本情報）、`materials`（画材・道具）、`annual_schedule`（年間スケジュール） |
+| `requests_static` | ご依頼の方タブ。`summary`、`contact_email`、`contact_instagram`、`contact_x` |
+| `social_links` | `instagram` / `x` / `email` |
+| `copyright` | フッターの著作権表示 |
 
-コンテンツ用スプレッドシートをサービスアカウントのメールアドレスと共有します（**閲覧者**権限で OK）。  
-サービスアカウントのメールアドレスは `{アカウント名}@{プロジェクト}.iam.gserviceaccount.com` の形式です。
+**`recruit_static` の中身**
 
-展示会の公開フォルダ（アーカイブ）も閲覧できるよう、Drive フォルダにも同様に共有します。
+- `info_points`：`label`（項目名）と `text`（内容）の並び。写真を付けるときは `image`（`src/` に置いたファイル名）、地図などへのリンクを付けるときは `link`（`url` と `label`）を足す。
+- `materials`：`name`（画材の名前）と `note`（説明）の並び。
+- `annual_schedule`：`period`（時期）、`label`（内容）、`accent`（色：`yellow` / `blue` / `green` / `white`）の並び。
 
-### Step 3: GitHub リポジトリの設定
+**文章の中のリンク**：`hero_subtitle`、`intro_text`、`information_text`、各タブの `summary`、`info_points` の `text` では、`[表示する文字](https://example.com)` と書くとリンクになります。
 
-1. **GitHub Pages の有効化**：リポジトリの「Settings」→「Pages」で Source を「GitHub Actions」に設定
-2. **シークレットの設定**（次節参照）
+### 写真を増やすときの注意
 
-### Step 4: ローカル開発環境の構築
+`src/` の画像は、ビルドの最後に `build_site.py` の `main()` が**ファイル名を指定して** `dist/` にコピーしています（`logo.png`、`clubroom.jpg`）。写真を増やしたら、ここにもコピーの行を足してください。足さないと、サイトで画像が表示されません。
+
+---
+
+## 3. デザインや動きを変えるとき
+
+- HTML は `scripts/build_site.py` が Python で組み立てています（テンプレートの仕組みは使っていません）。
+- 見た目は `src/stylesheet.css`、動き（タブ、写真の拡大表示、スライド）は `src/site.js` です。外部のライブラリは使っていません（アイコンだけ Font Awesome を読み込んでいます）。
+- 管理画面の右側の「プレビュー」は、このサイトの見た目をまねて作っています（homepage-cms の `UiStyles.html` の「サイトプレビュー」の部分）。サイトの見た目を変えたら、管理画面のプレビューも合わせて直すと、部員が公開前に確認しやすくなります。
+- 変えたら、手元でビルドして確認します（[4](#4-手元でのビルドと確認)）。
+
+---
+
+## 4. 手元でのビルドと確認
+
+手元でビルドするには、サービスアカウントの鍵（JSON）が必要です。鍵は管理者から受け取り、**リポジトリの外**に置いてください（`.gitignore` で `*service-account*.json` などを除外していますが、念のため）。
 
 ```bash
 cd homepage
 pip install -r requirements.txt
-```
 
----
-
-## 7. ローカルビルド手順
-
-ローカルで全ビルドを実行する場合：
-
-```bash
-cd homepage
-
-# Step 1: コンテンツ取得
+# ① 内容と画像を取得
 python scripts/fetch_google_content.py \
-  --service-account-json /path/to/service-account.json \
-  --content-spreadsheet-id YOUR_SPREADSHEET_ID \
+  --service-account-json <鍵ファイルのパス> \
+  --content-spreadsheet-id <コンテンツ用スプレッドシートの ID> \
   --output-json build/runtime/content_snapshot.json \
   --assets-dir build/runtime/assets
 
-# Step 2: 静的サイトビルド
+# ② HTML を作る
 python scripts/build_site.py \
   --static-config src/site_static.json \
   --content-snapshot build/runtime/content_snapshot.json \
   --assets-root build/runtime/assets \
   --output-dir dist
-```
 
-ビルド後、`dist/index.html` をブラウザで開いて確認できます。  
-（ただし相対パスで参照しているため、`python -m http.server` などのローカルサーバーで確認することを推奨）
-
-```bash
+# ③ 確認（ブラウザで http://localhost:8000 を開く）
 cd dist
 python -m http.server 8000
-# ブラウザで http://localhost:8000 を開く
 ```
+
+`build/` と `dist/` は Git に入りません。
 
 ---
 
-## 8. GitHub Actions のシークレット設定
+## 5. GitHub Actions とシークレット
 
-リポジトリの「Settings」→「Secrets and variables」→「Actions」→「New repository secret」で以下を追加します。
+ワークフロー（`.github/workflows/deploy.yml`）は `workflow_dispatch`（手動または管理画面からの起動）だけで動きます。
 
-| シークレット名 | 内容 |
-|--------------|------|
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | サービスアカウントの JSON キーファイルの中身をそのまま貼り付ける |
-| `CONTENT_SPREADSHEET_ID` | コンテンツ用スプレッドシートの ID（URL の `/d/` 以降）|
+| ジョブ | 内容 |
+|---|---|
+| `build` | Python の準備 → 内容の取得 → HTML を作る → GitHub Pages 用にまとめる |
+| `deploy` | GitHub Pages に公開する |
+
+リポジトリの「Settings」→「Secrets and variables」→「Actions」に、次のシークレットが必要です。
+
+| 名前 | 内容 |
+|---|---|
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | サービスアカウントの鍵（JSON ファイルの中身をそのまま貼る） |
+| `CONTENT_SPREADSHEET_ID` | コンテンツ用スプレッドシートの ID |
+
+サービスアカウントは、スプレッドシートと Drive を**読み取り専用**で使います。コンテンツ用スプレッドシートと、Drive の4つのルートフォルダを、サービスアカウントのメールアドレス（`…@….iam.gserviceaccount.com`）に「閲覧者」で共有しておく必要があります。
 
 ---
 
-## 9. ページ構成・UI 仕様
-
-### ページ構成（1 ページ完結の SPA 風構成）
+## 6. ページの構成と表示の決まり
 
 ```
-ナビゲーションバー（グローバルナビ）
-    ├── ロゴ + クラブ名
-    ├── ABOUT / INFO へのアンカーリンク
-    └── SNS リンク（Instagram / X / Email）
-
-ヒーローセクション（#home）
-    └── ロゴ・キャッチフレーズ・タイトル
-
-ABOUT セクション（#about）
-    └── 更新履歴ログ（UPDATE LOG）
-
-INFORMATION セクション（#info-tabs）
-    タブ切り替え
-    ├── 展覧会タブ
-    │   ├── 開催予定展示会（upcoming）
-    │   ├── 最新アーカイブ展示会（作品ギャラリー付き）
-    │   └── 過去の展示会アーカイブリスト
-    ├── 活動記録・告知タブ
-    ├── 入部希望の方タブ
-    │   ├── 基本情報（活動場所・頻度等）
-    │   ├── 使用材料リスト
-    │   ├── 年間スケジュール（タイムライン）
-    │   └── 新歓イベントカレンダー（カルーセル）
-    └── ご依頼の方タブ
-        ├── 連絡先情報
-        └── 過去の取り組み事例
-
+ナビゲーション（ロゴ、ABOUT / INFO へのリンク、SNS）
+トップ（#home）
+ABOUT（#about）：紹介文と更新履歴（UPDATE LOG）
+INFORMATION（#info-tabs）：タブで切り替え
+  ├── 展示会：開催予定 → 直近の展示（作品一覧つき）→ 過去の展示
+  ├── 活動記録・告知
+  ├── 入部希望の方：基本情報、画材、年間スケジュール、新歓カレンダー
+  └── ご依頼の方：連絡先、過去の取り組み事例
 フッター
-    └── コピーライト
 ```
 
-### レスポンシブ対応
+- **展示会の住所**は Google マップを開くリンクにしています（会場名と住所で検索）。地図の埋め込みはしていません（理由は homepage-cms の README の「設計の判断メモ」）。
+- **会期**は、管理画面が開始日・終了日から作った表示（`date_line`）をそのまま出します。
+- **作品一覧**は、登録した順に行ごとに並べ、1行の高さをそろえて、幅を画像の縦横比に合わせます（`render_work_gallery` と CSS の `.work-gallery`）。
+- **記事や事例の写真**は最大10枚まで使い、4枚まで並べて、それ以上は「+N」と表示します。押すと拡大表示（ライトボックス）になります。
+- **新歓カレンダー・DM** はスライド表示です。
+- **更新履歴**は、今も公開中の項目に関係するものだけを表示します。
+- **検索エンジン向け**：タイトル、説明、SNS で共有したときの表示、`sitemap.xml` を自動で作ります。`src/verification/` の HTML は Google Search Console の所有確認用で、そのまま公開されます。
 
-CSS の `clamp()` と メディアクエリでモバイル・タブレット・PC に対応しています。  
-特定のブレークポイント（例：768px, 1024px など）は `stylesheet.css` 内で定義されています。
+---
 
-### 画像表示コンポーネント
+## 7. 定期的な点検
 
-| コンポーネント | 用途 |
-|--------------|------|
-| カルーセル | 新歓カレンダー・DM 画像（スワイプ対応、ドット付き）|
-| 画像グリッド | 活動記事・依頼事例の写真（最大 4 枚表示、5 枚目以降は +N バッジ）|
-| ライトボックス | 全画像共通（クリックで全画面表示、前後移動、キーボード操作対応）|
-| 作品ギャラリー | 展示会作品（縦横比に応じた 2 列バランスレイアウト）|
+| 項目 | 確認すること |
+|---|---|
+| Python のライブラリ | `requirements.txt` は大きな版上げで壊れないよう上限（`<3` など）を付けています。上限を上げるときは、手元でビルドして確かめてから |
+| GitHub Actions の部品 | 実行結果に古い版の警告が出たら、`deploy.yml` の `actions/checkout@v5` などを上げる |
+| Font Awesome | `build_site.py` で 6.4.2 を読み込んでいる |
+| サービスアカウントの鍵 | 使えなくなったら新しい鍵を作り、シークレット `GOOGLE_SERVICE_ACCOUNT_JSON` を入れ替える |
 
-### SEO・OGP 設定
+---
 
-- `<title>`、`<meta name="description">`、`<link rel="canonical">` を自動生成
-- OGP（`og:title`, `og:image` 等）・Twitter Card メタタグを生成
-- `schema.org` の `Organization` / `WebSite` の JSON-LD を埋め込み
-- `sitemap.xml` を生成（`og_url` が設定されている場合）
-- `lastmod` は `ChangeLog` シートの最新エントリのタイムスタンプを使用
+## 8. ファイルごとの詳細
 
-### Google Search Console 認証
+```
+homepage/
+├── requirements.txt              Python のライブラリ
+├── .github/workflows/deploy.yml  ビルドと公開のワークフロー
+├── scripts/
+│   ├── fetch_google_content.py   スプレッドシート・Drive → JSON と画像
+│   └── build_site.py             JSON → HTML
+└── src/
+    ├── site_static.json          固定の文章
+    ├── stylesheet.css            見た目
+    ├── site.js                   動き
+    ├── logo.png / clubroom.jpg   画像
+    └── verification/             Google Search Console の所有確認ファイル
+```
 
-`src/verification/` 内の HTML ファイルが `dist/` のルートにコピーされ、  
-Google Search Console でのサイト所有権確認に使用されます。  
-新たに認証ファイルが必要になった場合はこのディレクトリに追加してください。
+### `scripts/fetch_google_content.py`
+
+| 関数 | 役割 |
+|---|---|
+| `build_clients()` | サービスアカウントの鍵から、スプレッドシートと Drive を読む準備をする（読み取り専用） |
+| `get_sheet_rows()` | シートの各行を、1行目の見出しを名前にして読む |
+| `normalize_recruit_calendar()` | 公開中の新歓カレンダーと画像 |
+| `normalize_activity_articles()` | 公開中の活動記録と画像 |
+| `normalize_exhibitions()` | 公開中の展示会を開催予定とアーカイブに分け、DM・作品の画像を取得 |
+| `normalize_requests()` | 公開中のご依頼事例と画像 |
+| `normalize_change_log()` | 更新履歴 |
+| `download_ordered_images_by_ids()` | 管理画面で並べた順（`media_file_ids`）に画像を取得 |
+| `download_folder_images()` | 並び順の情報がないときに、フォルダの画像をまとめて取得 |
+
+読むシートは `Recruit`、`ActivityArticles`、`Exhibitions`、`RequestCases`、`ChangeLog` です（各シートの列は homepage-cms の README の「スプレッドシートの構成」）。
+
+### `scripts/build_site.py`
+
+| 関数 | 役割 |
+|---|---|
+| `render_page()` | ページ全体を組み立てる |
+| `build_seo_context()` / `render_sitemap_xml()` | 検索エンジン向けの情報と sitemap |
+| `render_update_log()` | 更新履歴 |
+| `render_exhibition_upcoming()` / `render_exhibition_recent()` / `render_exhibition_archive()` | 展示会（開催予定・直近・過去） |
+| `render_exhibition_meta()` / `render_venue_address()` | 展示会の会期と会場。住所を Google マップへのリンクにする |
+| `render_work_gallery()` | 作品一覧 |
+| `render_activity_cards()` / `render_request_cards()` | 活動記録・ご依頼事例 |
+| `render_image_grid()` / `render_carousel()` / `render_recruit_calendar()` | 写真の並べ方・スライド |
+| `render_timeline()` / `render_info_points()` | 年間スケジュール・入部の基本情報 |
+| `image_aspect()` | 画像の縦横比を読む（並べ方の調整に使う） |
+| `main()` | 全体の流れ。最後に `src/` のファイルを `dist/` にコピーする（[写真を増やすときの注意](#写真を増やすときの注意)） |
+
+---
+
+## 9. 一から作り直すときのセットアップ手順
+
+1. **Google Cloud でサービスアカウントを作る**：[Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作り、「Google Sheets API」と「Google Drive API」を有効にする。サービスアカウントを作り、鍵（JSON）を作ってダウンロードする。
+2. **共有する**：コンテンツ用スプレッドシートと Drive の4つのルートフォルダを、サービスアカウントのメールアドレスに「閲覧者」で共有する。
+3. **GitHub Pages を有効にする**：リポジトリの「Settings」→「Pages」で、Source を「GitHub Actions」にする。
+4. **シークレットを登録する**（[5](#5-github-actions-とシークレット)）。
+5. **管理画面から動かしてみる**：管理画面で「公開する」を押し、Actions が成功してサイトが表示されるか確かめる。
