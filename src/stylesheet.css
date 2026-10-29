@@ -831,19 +831,19 @@ a { color: inherit; }
   color: var(--text-soft);
   display: block;
 }
-.map-embed {
-  margin-top: 48px;
-  min-height: 312px;
-  overflow: hidden;
-  border-radius: 18px;
+/* 住所は Google マップへのリンク。押せることがわかるよう、地図アイコンと下線を付ける */
+.venue-map-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  width: fit-content;
+  color: var(--text-soft);
+  text-decoration: underline;
+  text-decoration-color: rgba(255,255,255,0.4);
+  text-underline-offset: 4px;
 }
-.map-embed iframe { width: 100%; height: 320px; border: 0; background: #111; display: block; }
-.upcoming-card .map-embed {
-  margin-top: 32px;
-  flex: 1 1 auto;
-  min-height: 260px;
-}
-.upcoming-card .map-embed iframe { min-height: 100%; }
+.venue-map-link i { color: var(--color-yellow); font-size: 0.9em; }
+.venue-map-link:hover { color: var(--color-white); text-decoration-color: var(--color-yellow); }
 
 /* アーカイブ */
 .archive-list { display: grid; }
@@ -1364,8 +1364,6 @@ footer {
     grid-template-columns: 1fr;
     gap: 6px;
   }
-  .map-embed { min-height: 250px; }
-  .map-embed iframe { height: 250px; }
 
   /* 展示ヒーロー: DMを先頭・中央に */
   .upcoming-card .exhibition-hero { display: grid; }

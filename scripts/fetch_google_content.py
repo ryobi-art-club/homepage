@@ -300,7 +300,6 @@ def normalize_exhibitions(ex_rows: list[dict[str, str]], drive, assets_root: Pat
             'time_line': row.get('time_line', ''),
             'folder_id': folder_id,
             'folder_url': f'https://drive.google.com/drive/folders/{folder_id}' if folder_id else '',
-            'map_embed_url': row.get('map_embed_url', ''),
             'dm_image': dm_image,
             'dm_images': dm_images,
             'works': works,

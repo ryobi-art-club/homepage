@@ -10,6 +10,7 @@ from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 
 ASSET_SOURCE_ROOT = Path(".")
@@ -463,10 +464,26 @@ def render_request_cards(items: list[dict[str, Any]]) -> str:
         )
     return f'<div class="request-grid">{"".join(cards)}</div>'
 
+def google_maps_search_url(query: str) -> str:
+    # Google が公式に案内している、地図を開くための URL（API キー不要）
+    return 'https://www.google.com/maps/search/?api=1&query=' + quote(query, safe='')
+
+
+def render_venue_address(item: dict[str, Any]) -> str:
+    # 住所は Google マップへのリンクにする。会場名も検索語に含めて、建物まで絞り込みやすくする
+    address = item.get('venue_address', '')
+    query = ' '.join(part for part in [item.get('venue_name', ''), address] if part)
+    return (
+        f'<a class="venue-address venue-map-link" href="{escape(google_maps_search_url(query))}" '
+        f'target="_blank" rel="noopener noreferrer" aria-label="{escape(address)}（Google マップで開く）">'
+        f'<i class="fa-solid fa-location-dot" aria-hidden="true"></i><span>{escape(address)}</span></a>'
+    )
+
+
 def render_exhibition_meta(item: dict[str, Any], include_address: bool = True) -> str:
     venue_parts = [f'<span>{escape(item.get("venue_name", ""))}</span>' if item.get('venue_name') else '']
     if include_address and item.get('venue_address'):
-        venue_parts.append(f'<span class="venue-address">{escape(item.get("venue_address", ""))}</span>')
+        venue_parts.append(render_venue_address(item))
     venue_html = ''.join(part for part in venue_parts if part)
     date_time_parts = []
     if item.get('date_line'):
@@ -523,13 +540,6 @@ def render_exhibition_upcoming(items: list[dict[str, Any]]) -> str:
         return ''
     cards = []
     for index, upcoming in enumerate(items):
-        map_embed = ''
-        if upcoming.get('map_embed_url'):
-            map_embed = f"""
-            <div class="map-embed">
-              <iframe src="{escape(upcoming['map_embed_url'])}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="{escape(upcoming.get('title', ''))} 会場マップ"></iframe>
-            </div>
-            """
         overview = upcoming.get('overview') or upcoming.get('theme', '')
         poster = render_dm_carousel(upcoming, upcoming.get('title', '展示会DM'))
         kicker = 'NEXT EXHIBITION' if index == 0 else 'UPCOMING'
@@ -541,7 +551,6 @@ def render_exhibition_upcoming(items: list[dict[str, Any]]) -> str:
               {render_exhibition_heading(upcoming, kicker, 'desktop')}
               <p class="exhibition-overview">{nl2br(overview)}</p>
               {render_exhibition_meta(upcoming, include_address=True)}
-              {map_embed}
             </div>
             {poster}
           </div>
