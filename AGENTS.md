@@ -11,7 +11,10 @@ The public website of the 凌美会 art club, built as one static page and publi
 ```bash
 pip install -r requirements.txt
 python -m py_compile scripts/build_site.py scripts/fetch_google_content.py
+python -m unittest discover tests     # no Google access needed; the workflow runs it before every build
 ```
+
+The content comes from `_PublishedState` as JSON (format version 2; its shape is defined in homepage-cms README section 8-4 and `CONTENT_FIELDS` in `Store.js`). Older formats are read only through `upgrade_content`. Change both repositories together when the shape changes.
 
 A full local build needs the service-account key and the spreadsheet ID (README section 4). **Do not look for or read the key yourself**; ask the maintainer to run the fetch step. Rendering functions can be checked without Google access by importing `scripts/build_site.py` and calling them with small dicts.
 

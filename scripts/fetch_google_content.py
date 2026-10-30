@@ -6,6 +6,7 @@ import json
 import mimetypes
 import os
 import shutil
+import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -20,16 +21,10 @@ SCOPES = [
     'https://www.googleapis.com/auth/drive.readonly',
     'https://www.googleapis.com/auth/spreadsheets.readonly',
 ]
-SHEETS_RANGE_MAP = {
-    'Recruit': 'Recruit!A1:Z2000',
-    'PublishControl': 'PublishControl!A1:Z200',
-    'ActivityArticles': 'ActivityArticles!A1:Z2000',
-    'Exhibitions': 'Exhibitions!A1:Z2000',
-    'RequestCases': 'RequestCases!A1:Z2000',
-    'ChangeLog': 'ChangeLog!A1:Z2000',
-}
-# The CMS keeps the whole published content as JSON in this sheet (see read_published_tables)
+# 管理画面は、公開した内容全体を _PublishedState に JSON で書く（形は homepage-cms の README「8-4」）
 PUBLISHED_STATE_RANGE = "'_PublishedState'"
+CHANGE_LOG_RANGE = 'ChangeLog!A1:Z2000'
+CONTENT_FORMAT_VERSION = 2
 
 
 def now_iso() -> str:
@@ -212,19 +207,6 @@ def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
-def parse_bool(value: str) -> bool:
-    return str(value).strip().lower() in {'1', 'true', 'yes', 'on', 'y'}
-
-
-def parse_json_cell(value: str, fallback: Any) -> Any:
-    if not value:
-        return fallback
-    try:
-        return json.loads(value)
-    except (TypeError, json.JSONDecodeError):
-        return fallback
-
-
 def file_extension_from_name(name: str, mime_type: str) -> str:
     if '.' in name:
         return '.' + name.rsplit('.', 1)[1].lower()
@@ -246,106 +228,73 @@ def list_folder_files(drive, folder_id: str) -> list[dict[str, Any]]:
     return drive.list_folder(folder_id)
 
 
-def parse_bool_value(value: Any) -> bool:
-    return value is True or parse_bool(value)
+def read_published_content(sheets, spreadsheet_id: str) -> dict[str, Any]:
+    """_PublishedState の内容。まだ公開していなければ空の内容。
 
-
-def read_published_payload(sheets, spreadsheet_id: str) -> dict[str, Any] | None:
-    """The content the CMS published last, from the payload_json cells of _PublishedState.
-
-    A payload longer than one cell allows is split by the CMS (buildPayloadCells_ in homepage-cms/Store.js):
-    payload_json then holds {"storage_format": "chunked-json-v1", "chunk_count": n} and the columns
-    payload_json_2 … payload_json_{n+1} hold the pieces, each written as a JSON string."""
+    長い内容は管理画面がセルを分けて書く（homepage-cms の Store.js の buildPayloadCells_）。
+    payload_json に {"storage_format": "chunked-json-v1", "chunk_count": n} を書き、
+    payload_json_2 から n 個の列に、JSON の文字列として分けた中身を置く。
+    読めないときは止める。空のサイトを作って公開してしまわないため。"""
     rows = get_sheet_rows(sheets, spreadsheet_id, PUBLISHED_STATE_RANGE)
     if not rows or not rows[0].get('payload_json'):
-        return None
+        return {}
     row = rows[0]
-    try:
-        payload = json.loads(row['payload_json'])
-        if payload.get('storage_format') == 'chunked-json-v1':
-            count = payload.get('chunk_count')
-            if not isinstance(count, int) or count < 1:
-                raise ValueError('invalid chunk count')
-            pieces = [json.loads(row.get(f'payload_json_{index + 2}', '')) for index in range(count)]
-            if not all(isinstance(piece, str) for piece in pieces):
-                raise ValueError('invalid chunk')
-            payload = json.loads(''.join(pieces))
-    except (ValueError, TypeError, AttributeError) as error:
-        print(f'Could not read _PublishedState ({error}); reading the content sheets instead')
-        return None
-    return payload if isinstance(payload, dict) else None
+    content = json.loads(row['payload_json'])
+    if content.get('storage_format') == 'chunked-json-v1':
+        pieces = [json.loads(row[f'payload_json_{index + 2}']) for index in range(content['chunk_count'])]
+        content = json.loads(''.join(pieces))
+    if not isinstance(content, dict):
+        raise ValueError('_PublishedState の内容が JSON のオブジェクトではありません')
+    return content
 
 
-def tables_from_published(payload: dict[str, Any]) -> dict[str, list[dict[str, str]]]:
-    """The published content as rows shaped like the old content sheets, so the normalize_* functions
-    read both the same way."""
-    def flag(value: Any) -> str:
-        return 'TRUE' if parse_bool_value(value) else 'FALSE'
+def upgrade_content(content: dict[str, Any]) -> dict[str, Any]:
+    """版1（formatVersion がない、2026年10月までの形）を版2に直す。古い形を読む処理はここだけに置く。
+    管理画面の upgradeContent_ と同じ直し方。版2で最初に公開したあとは要らなくなる（設計書 段階3）。"""
+    if content.get('formatVersion') == CONTENT_FORMAT_VERSION:
+        return content
 
-    def text(value: Any) -> str:
-        return '' if value is None else str(value)
+    def with_folder(item: dict[str, Any]) -> dict[str, Any]:
+        folder = item.get('mediaFolderId') or item.get('driveFolderId') or item.get('photoFolderId') or item.get('folderId') or ''
+        return {**item, 'mediaFolderId': folder}
 
-    def folder(item: dict[str, Any]) -> str:
-        return text(item.get('mediaFolderId') or item.get('folderId') or item.get('photoFolderId') or item.get('driveFolderId'))
+    def in_stored_order(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        def order(item: dict[str, Any]) -> int:
+            return int(item.get('sortOrder') or item.get('sort_order') or sys.maxsize)
+        return sorted(items or [], key=order)
 
     return {
-        'Recruit': [{
-            'year': text(item.get('year')),
-            'media_folder_id': folder(item),
-            'media_file_ids': json.dumps(item.get('mediaFileIds') or []),
-            'published': flag(item.get('published')),
-        } for item in payload.get('recruitCalendars') or []],
-        'ActivityArticles': [{
-            'article_id': text(item.get('articleId')),
-            'title': text(item.get('title')),
-            'category': text(item.get('category')),
-            'body': text(item.get('body')),
-            'media_folder_id': folder(item),
-            'media_file_ids': json.dumps(item.get('mediaFileIds') or []),
-            'published': flag(item.get('published', True)),
-            'created_at': text(item.get('createdAt')),
-        } for item in payload.get('activityArticles') or []],
-        'Exhibitions': [{
-            'exhibition_id': text(item.get('exhibitionId')),
-            'title': text(item.get('title')),
-            'subtitle': text(item.get('subtitle')),
-            'theme': text(item.get('theme')),
-            'venue_name': text(item.get('venueName')),
-            'venue_address': text(item.get('venueAddress')),
-            'date_line': text(item.get('dateLine')),
-            'time_line': text(item.get('timeLine')),
-            'display_bucket': text(item.get('displayBucket')),
-            'media_folder_id': folder(item),
-            'dm_file_ids': json.dumps(item.get('dmFileIds') or []),
-            'work_files': json.dumps(item.get('workFiles') or item.get('works') or []),
-            'published': flag(item.get('published', True)),
-            'start_date': text(item.get('startDate')),
-        } for item in payload.get('exhibitions') or []],
-        'RequestCases': [{
-            'case_id': text(item.get('caseId')),
-            'title': text(item.get('title')),
-            'body': text(item.get('body')),
-            'media_folder_id': folder(item),
-            'media_file_ids': json.dumps(item.get('mediaFileIds') or []),
-            'sort_order': text(item.get('sortOrder')),
-            'published': flag(item.get('published', True)),
-        } for item in payload.get('requestCases') or []],
-        'PublishControl': [],
+        **content,
+        'formatVersion': CONTENT_FORMAT_VERSION,
+        'recruitCalendars': [with_folder(item) for item in content.get('recruitCalendars') or []],
+        'activityArticles': [with_folder(item) for item in content.get('activityArticles') or []],
+        'exhibitions': [{
+            **with_folder(item),
+            'works': [{
+                'fileId': work.get('fileId') or work.get('file_id') or '',
+                'title': work.get('title') or work.get('workTitle') or '',
+                'artist': work.get('artist') or work.get('artistName') or '',
+            } for work in in_stored_order(item.get('workFiles') or item.get('works'))],
+        } for item in content.get('exhibitions') or []],
+        'requestCases': [with_folder(item) for item in in_stored_order(content.get('requestCases'))],
     }
 
 
-# Every file the published rows point at, so their metadata can be read in a few batch requests
-def referenced_file_ids(tables: dict[str, list[dict[str, str]]]) -> list[str]:
-    ids = []
-    for name in ('Recruit', 'PublishControl', 'ActivityArticles', 'RequestCases'):
-        for row in tables[name]:
-            ids.extend(parse_json_cell(row.get('media_file_ids', ''), [])[:10])
-    for row in tables['Exhibitions']:
-        if not parse_bool(row.get('published', 'TRUE')):
-            continue
-        ids.extend(parse_json_cell(row.get('dm_file_ids', ''), [])[:2])
-        ids.extend(work.get('file_id') or work.get('fileId') or '' for work in parse_json_cell(row.get('work_files', ''), []))
+# サイトに載せる画像のファイル ID。ファイルの情報をまとめて問い合わせるために集める
+def referenced_file_ids(content: dict[str, Any]) -> list[str]:
+    calendar = published_recruit_calendar(content.get('recruitCalendars') or [])
+    ids = list((calendar.get('mediaFileIds') or [])[:10])
+    for name in ('activityArticles', 'requestCases'):
+        for item in published_items(content.get(name)):
+            ids.extend((item.get('mediaFileIds') or [])[:10])
+    for item in published_items(content.get('exhibitions')):
+        ids.extend((item.get('dmFileIds') or [])[:2])
+        ids.extend(work['fileId'] for work in item.get('works') or [])
     return [str(file_id).strip() for file_id in ids if str(file_id).strip()]
+
+
+def published_items(items: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    return [item for item in items or [] if item.get('published', True) and item.get('title')]
 
 
 def download_folder_images(drive, folder_id: str, output_root: Path, logical_group: str, max_images: int | None = None) -> list[str]:
@@ -395,91 +344,76 @@ def normalize_change_log(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     return sorted(items, key=lambda x: x['timestamp'], reverse=True)
 
 
-def normalize_activity_articles(rows: list[dict[str, str]], drive, assets_root: Path) -> list[dict[str, Any]]:
+def normalize_activity_articles(articles: list[dict[str, Any]], drive, assets_root: Path) -> list[dict[str, Any]]:
     items = []
-    for row in rows:
-        if not parse_bool(row.get('published', 'TRUE')):
-            continue
-        if not row.get('title'):
-            continue
-        article_id = row.get('article_id') or safe_slug(row.get('title', 'article'))
-        file_ids = parse_json_cell(row.get('media_file_ids', ''), [])
-        images = download_ordered_images_by_ids(drive, file_ids, assets_root, f'activities/{article_id}', max_images=10)
-        if not images:
-            images = download_folder_images(drive, row.get('media_folder_id') or row.get('photo_folder_id', ''), assets_root, f'activities/{article_id}', max_images=10)
+    for article in published_items(articles):
+        article_id = article.get('articleId') or safe_slug(article['title'])
+        images = item_images(drive, article, assets_root, f'activities/{article_id}')
         items.append({
             'id': article_id,
-            'title': row.get('title', ''),
-            'body': row.get('body', ''),
-            'category': row.get('category', 'record') or 'record',
-            'created_at': row.get('created_at') or row.get('updated_at') or now_iso(),
+            'title': article['title'],
+            'body': article.get('body', ''),
+            'category': article.get('category') or 'record',
+            'created_at': article.get('createdAt') or now_iso(),
             'images': images,
         })
-    return sorted(items, key=lambda x: x.get('created_at', ''), reverse=True)
+    return sorted(items, key=lambda x: x['created_at'], reverse=True)
 
 
-def normalize_requests(rows: list[dict[str, str]], drive, assets_root: Path) -> list[dict[str, Any]]:
+# 並び順は、管理画面で並べた一覧の順番のまま
+def normalize_requests(cases: list[dict[str, Any]], drive, assets_root: Path) -> list[dict[str, Any]]:
     items = []
-    for row in rows:
-        if not parse_bool(row.get('published', 'TRUE')):
-            continue
-        if not row.get('title'):
-            continue
-        case_id = row.get('case_id') or safe_slug(row.get('title', 'case'))
-        file_ids = parse_json_cell(row.get('media_file_ids', ''), [])
-        images = download_ordered_images_by_ids(drive, file_ids, assets_root, f'requests/{case_id}', max_images=10)
-        if not images:
-            images = download_folder_images(drive, row.get('media_folder_id') or row.get('photo_folder_id', ''), assets_root, f'requests/{case_id}', max_images=10)
+    for case in published_items(cases):
+        case_id = case.get('caseId') or safe_slug(case['title'])
         items.append({
             'id': case_id,
-            'title': row.get('title', ''),
-            'body': row.get('body', ''),
-            'sort_order': int(row.get('sort_order') or 9999),
-            'images': images,
+            'title': case['title'],
+            'body': case.get('body', ''),
+            'images': item_images(drive, case, assets_root, f'requests/{case_id}'),
         })
-    return sorted(items, key=lambda x: x['sort_order'])
+    return items
 
 
-def normalize_recruit_calendar(recruit_rows: list[dict[str, str]], drive, assets_root: Path) -> dict[str, Any]:
-    row = next((item for item in recruit_rows if parse_bool(item.get('published', ''))), recruit_rows[0] if recruit_rows else {})
-    year = str(row.get('year', '')).strip()
-    label = f'{year}年度 新歓イベントカレンダー' if year else '新歓イベントカレンダー'
-    file_ids = parse_json_cell(row.get('media_file_ids', ''), [])
-    images = download_ordered_images_by_ids(drive, file_ids, assets_root, 'recruit', max_images=10)
-    if not images:
-        images = download_folder_images(drive, row.get('media_folder_id') or row.get('recruit_calendar_folder_id', ''), assets_root, 'recruit', max_images=10)
+def published_recruit_calendar(calendars: list[dict[str, Any]]) -> dict[str, Any]:
+    return next((item for item in calendars if item.get('published') is True), calendars[0] if calendars else {})
+
+
+def normalize_recruit_calendar(calendars: list[dict[str, Any]], drive, assets_root: Path) -> dict[str, Any]:
+    calendar = published_recruit_calendar(calendars)
+    year = str(calendar.get('year', '')).strip()
     return {
-        'label': label,
+        'label': f'{year}年度 新歓イベントカレンダー' if year else '新歓イベントカレンダー',
         'year': year,
-        'images': images,
+        'images': item_images(drive, calendar, assets_root, 'recruit'),
     }
 
 
-def normalize_exhibitions(ex_rows: list[dict[str, str]], drive, assets_root: Path) -> dict[str, Any]:
+def item_images(drive, item: dict[str, Any], assets_root: Path, logical_group: str) -> list[str]:
+    """登録した画像を、並べた順に10枚まで。画像の登録ができる前に保存した項目（一覧が空）は、
+    フォルダの画像を名前の順に使う（管理画面の fillUnregisteredMediaIds_ と同じ扱い）。"""
+    images = download_ordered_images_by_ids(drive, item.get('mediaFileIds') or [], assets_root, logical_group, max_images=10)
+    if not images:
+        images = download_folder_images(drive, item.get('mediaFolderId', ''), assets_root, logical_group, max_images=10)
+    return images
+
+
+def normalize_exhibitions(exhibitions: list[dict[str, Any]], drive, assets_root: Path) -> dict[str, Any]:
     upcoming = []
     archive = []
-
-    published_rows = [row for row in ex_rows if parse_bool(row.get('published', 'TRUE')) and row.get('title')]
-    published_rows.sort(key=lambda x: x.get('start_date', ''), reverse=True)
-
-    for row in published_rows:
-        ex_id = row.get('exhibition_id') or safe_slug(row.get('title', 'exhibition'))
-        folder_id = row.get('media_folder_id') or row.get('drive_folder_id', '')
-        dm_candidates = [get_file_meta(drive, file_id) for file_id in parse_json_cell(row.get('dm_file_ids', ''), [])[:2]]
-        dm_candidates = [file for file in dm_candidates if file and file.get('mimeType', '').startswith('image/')]
+    for exhibition in published_items(exhibitions):
+        ex_id = exhibition.get('exhibitionId') or safe_slug(exhibition['title'])
+        folder_id = exhibition.get('mediaFolderId', '')
+        dm_files = [get_file_meta(drive, file_id) for file_id in (exhibition.get('dmFileIds') or [])[:2]]
         dm_images = []
-        for dm_index, dm_file in enumerate(dm_candidates, start=1):
+        for dm_index, dm_file in enumerate((file for file in dm_files if file and file.get('mimeType', '').startswith('image/')), start=1):
             dm_ext = file_extension_from_name(dm_file.get('name', ''), dm_file.get('mimeType', ''))
             dm_target = assets_root / 'exhibitions' / ex_id / f'DM{dm_index}{dm_ext}'
             download_file(drive, dm_file['id'], dm_target)
             dm_images.append(str(dm_target.relative_to(assets_root.parent)).replace(os.sep, '/'))
-        dm_image = dm_images[0] if dm_images else ''
 
         works = []
-        work_rows_for_ex = sorted(parse_json_cell(row.get('work_files', ''), []), key=lambda x: int(x.get('sort_order') or x.get('sortOrder') or 9999))[:200]
-        for work_index, work_row in enumerate(work_rows_for_ex, start=1):
-            file_id = str(work_row.get('file_id') or work_row.get('fileId') or '').strip()
-            file_meta = get_file_meta(drive, file_id)
+        for work_index, work in enumerate((exhibition.get('works') or [])[:200], start=1):
+            file_meta = get_file_meta(drive, work['fileId'])
             if not file_meta or not file_meta.get('mimeType', '').startswith('image/'):
                 continue
             ext = file_extension_from_name(file_meta.get('name', ''), file_meta.get('mimeType', ''))
@@ -487,35 +421,33 @@ def normalize_exhibitions(ex_rows: list[dict[str, str]], drive, assets_root: Pat
             download_file(drive, file_meta['id'], image_target)
             works.append({
                 'image': str(image_target.relative_to(assets_root.parent)).replace(os.sep, '/'),
-                'title': work_row.get('title') or work_row.get('workTitle', ''),
-                'artist': work_row.get('artist') or work_row.get('artistName', ''),
+                'title': work.get('title', ''),
+                'artist': work.get('artist', ''),
             })
 
         payload = {
             'id': ex_id,
-            'title': row.get('title', ''),
-            'subtitle': row.get('subtitle', ''),
-            'theme': row.get('theme', ''),
-            'overview': row.get('overview', '') or row.get('summary', ''),
-            'venue_name': row.get('venue_name', ''),
-            'venue_address': row.get('venue_address', ''),
-            'date_line': row.get('date_line', ''),
-            'time_line': row.get('time_line', ''),
+            'title': exhibition['title'],
+            'subtitle': exhibition.get('subtitle', ''),
+            'theme': exhibition.get('theme', ''),
+            'venue_name': exhibition.get('venueName', ''),
+            'venue_address': exhibition.get('venueAddress', ''),
+            'date_line': exhibition.get('dateLine', ''),
+            'time_line': exhibition.get('timeLine', ''),
             'folder_id': folder_id,
             'folder_url': f'https://drive.google.com/drive/folders/{folder_id}' if folder_id else '',
-            'dm_image': dm_image,
+            'dm_image': dm_images[0] if dm_images else '',
             'dm_images': dm_images,
             'works': works,
-            'start_date': row.get('start_date', ''),
+            'start_date': exhibition.get('startDate', ''),
         }
-        status = (row.get('display_bucket') or '').strip().lower()
-        if status == 'upcoming':
+        if (exhibition.get('displayBucket') or '').strip().lower() == 'upcoming':
             upcoming.append(payload)
         else:
             archive.append(payload)
 
-    upcoming.sort(key=lambda x: x.get('start_date', ''))
-    archive.sort(key=lambda x: x.get('start_date', ''), reverse=True)
+    upcoming.sort(key=lambda x: x['start_date'])
+    archive.sort(key=lambda x: x['start_date'], reverse=True)
     return {'upcoming': upcoming, 'archive': archive}
 
 
@@ -537,23 +469,15 @@ def main() -> None:
     ensure_dir(assets_dir)
     ensure_dir(output_json.parent)
 
-    # The content sheets (Recruit, ActivityArticles, …) are read only when _PublishedState cannot be
-    published = read_published_payload(sheets, spreadsheet_id)
-    if published is not None:
-        tables = tables_from_published(published)
-        tables['ChangeLog'] = get_sheet_rows(sheets, spreadsheet_id, SHEETS_RANGE_MAP['ChangeLog'])
-        print('Content: _PublishedState')
-    else:
-        tables = {name: get_sheet_rows(sheets, spreadsheet_id, range_name) for name, range_name in SHEETS_RANGE_MAP.items()}
-        print('Content: content sheets')
-    drive.prefetch_meta(referenced_file_ids(tables))
+    content = upgrade_content(read_published_content(sheets, spreadsheet_id))
+    drive.prefetch_meta(referenced_file_ids(content))
     snapshot = {
         'meta': {'generated_at': now_iso()},
-        'recruit_calendar': normalize_recruit_calendar(tables['Recruit'] or tables['PublishControl'], drive, assets_dir),
-        'activities': normalize_activity_articles(tables['ActivityArticles'], drive, assets_dir),
-        'requests': normalize_requests(tables['RequestCases'], drive, assets_dir),
-        'exhibitions': normalize_exhibitions(tables['Exhibitions'], drive, assets_dir),
-        'change_log': normalize_change_log(tables['ChangeLog']),
+        'recruit_calendar': normalize_recruit_calendar(content.get('recruitCalendars') or [], drive, assets_dir),
+        'activities': normalize_activity_articles(content.get('activityArticles'), drive, assets_dir),
+        'requests': normalize_requests(content.get('requestCases'), drive, assets_dir),
+        'exhibitions': normalize_exhibitions(content.get('exhibitions'), drive, assets_dir),
+        'change_log': normalize_change_log(get_sheet_rows(sheets, spreadsheet_id, CHANGE_LOG_RANGE)),
     }
     drive.finish()
     removed = drive.prune_cache()

@@ -128,6 +128,14 @@ python -m http.server 8000
 
 `build/` と `dist/` は Git に入りません。
 
+**テスト**：鍵がなくても動きます（Google には接続せず、偽の Sheets と Drive を使う）。GitHub Actions でも、ビルドの前に必ず動かします。テストが通らなければビルドは止まり、サイトは前の状態のまま残ります。
+
+```bash
+python -m unittest discover tests
+```
+
+`tests/test_fetch_google_content.py` は、`_PublishedState` の読み方（セルを分けた形を含む）、古い形（版1）の直し方、版1と版2から同じサイトのデータができること、画像のキャッシュを確かめます。
+
 ---
 
 ## 5. GitHub Actions とシークレット
@@ -136,7 +144,7 @@ python -m http.server 8000
 
 | ジョブ | 内容 |
 |---|---|
-| `build` | Python の準備 → 前回の画像のキャッシュを戻す → 内容の取得 → HTML を作る → GitHub Pages 用にまとめる → 画像のキャッシュを保存し、古いキャッシュを消す |
+| `build` | Python の準備 → テスト → 前回の画像のキャッシュを戻す → 内容の取得 → HTML を作る → GitHub Pages 用にまとめる → 画像のキャッシュを保存し、古いキャッシュを消す |
 | `deploy` | GitHub Pages に公開する |
 
 ### 画像のキャッシュ
@@ -217,24 +225,25 @@ homepage/
 |---|---|
 | `build_clients()` | サービスアカウントの鍵から、スプレッドシートと Drive を読む準備をする（読み取り専用） |
 | `DriveFiles` | Drive の読み取り。ファイルの情報をまとめて問い合わせ（`prefetch_meta`）、画像を同時に取得し（`download`・`finish`）、キャッシュを整理する（`prune_cache`） |
-| `referenced_file_ids()` | シートの行が指している画像のファイル ID を集める（情報をまとめて問い合わせるため） |
+| `referenced_file_ids()` | サイトに載せる画像のファイル ID を集める（情報をまとめて問い合わせるため） |
 | `get_sheet_rows()` | シートの各行を、1行目の見出しを名前にして読む |
 | `normalize_recruit_calendar()` | 公開中の新歓カレンダーと画像 |
 | `normalize_activity_articles()` | 公開中の活動記録と画像 |
 | `normalize_exhibitions()` | 公開中の展示会を開催予定とアーカイブに分け、DM・作品の画像を取得 |
 | `normalize_requests()` | 公開中のご依頼事例と画像 |
 | `normalize_change_log()` | 更新履歴 |
-| `download_ordered_images_by_ids()` | 管理画面で並べた順（`media_file_ids`）に画像を取得 |
+| `download_ordered_images_by_ids()` | 管理画面で並べた順（`mediaFileIds`）に画像を取得 |
 | `download_folder_images()` | 並び順の情報がないときに、フォルダの画像をまとめて取得 |
-| `read_published_payload()` | `_PublishedState` から公開中の内容を読む（分けて書かれたセルをつなぎ直す） |
-| `tables_from_published()` | 読んだ内容を、以前の内容のシートの行と同じ形にする |
+| `read_published_content()` | `_PublishedState` から公開中の内容を読む（分けて書かれたセルをつなぎ直す） |
+| `upgrade_content()` | 古い形（版1）の内容を版2に直す。管理画面の `upgradeContent_` と同じ直し方 |
+| `item_images()` | 項目の画像を、登録した順に10枚まで取得する |
 
 読むシートは `_PublishedState` と `ChangeLog` です（各シートの列は homepage-cms の README の「スプレッドシートの構成」）。
 
-- **内容は `_PublishedState` から読みます**（`read_published_payload`）。管理画面が公開のたびに、公開した内容全体を JSON で書くシートです。1つのセルに入りきらないとき（45,000文字超）は、管理画面が20,000文字ずつ横の列（`payload_json_2`…）に分けて書き、`payload_json` には `{"storage_format": "chunked-json-v1", "chunk_count": n}` を書きます。読むときにつなぎ直します。
-- 読んだ内容は `tables_from_published` で、以前の内容のシート（`Recruit`・`ActivityArticles`・`Exhibitions`・`RequestCases`）の行と同じ形に直し、`normalize_…` の関数に渡します。
-- `_PublishedState` がない・読めないときは、以前の内容のシートから読みます（ビルドの記録に `Content: content sheets` と出ます）。管理画面がまだ以前の版のときや、移行の途中のための逃げ道です。
-- 2026年10月に、同じ内容から両方の読み方で作ったサイトのデータが一致することを、本番のデータで確かめました。
+- **内容は `_PublishedState` から読みます**（`read_published_content`）。管理画面が公開のたびに、公開した内容全体を JSON で書くシートです。JSON の形（版2）は homepage-cms の README の「8-4」にあります。1つのセルに入りきらないとき（45,000文字超）は、管理画面が20,000文字ずつ横の列（`payload_json_2`…）に分けて書き、`payload_json` には `{"storage_format": "chunked-json-v1", "chunk_count": n}` を書きます。読むときにつなぎ直します。
+- `_PublishedState` が読めないときは、ビルドを止めます。サイトは前の状態のまま残ります（空のサイトを公開しないため）。
+- 古い形（版1）の内容は `upgrade_content` で版2に直してから使います。
+- 並び順は、管理画面で並べた一覧の順番のままです（ご依頼事例・作品）。
 
 ### `scripts/build_site.py`
 

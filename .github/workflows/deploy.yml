@@ -27,6 +27,10 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      # テストが通らなければ、ここで止まる（サイトは前の状態のまま）
+      - name: Run tests
+        run: python -m unittest discover tests
+
       - name: Restore Google service account key
         run: |
           printf '%s' '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > /tmp/service-account.json

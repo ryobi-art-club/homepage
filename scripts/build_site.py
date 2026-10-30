@@ -446,9 +446,8 @@ def render_activity_cards(items: list[dict[str, Any]]) -> str:
 def render_request_cards(items: list[dict[str, Any]]) -> str:
     if not items:
         return '<div class="empty-message">公開中の事例はありません。</div>'
-    ordered = sorted(items, key=lambda x: int(x.get('sort_order', 9999)))
     cards = []
-    for item in ordered:
+    for item in items:
         images = render_image_grid(item.get('images', []), item.get('title', '取り組み事例'), 'request-' + str(item.get('id', '')))
         cards.append(
             f"""
@@ -540,7 +539,7 @@ def render_exhibition_upcoming(items: list[dict[str, Any]]) -> str:
         return ''
     cards = []
     for index, upcoming in enumerate(items):
-        overview = upcoming.get('overview') or upcoming.get('theme', '')
+        overview = upcoming.get('theme', '')
         poster = render_dm_carousel(upcoming, upcoming.get('title', '展示会DM'))
         kicker = 'NEXT EXHIBITION' if index == 0 else 'UPCOMING'
         cards.append(f"""
@@ -686,7 +685,7 @@ def render_exhibition_recent(recent: dict[str, Any] | None) -> str:
     works = recent.get('works', [])
     gallery_id = 'recent-works-' + re.sub(r'[^a-zA-Z0-9_-]+', '-', str(recent.get('id', 'recent'))).strip('-')
     work_gallery = render_work_gallery(works, gallery_id)
-    overview = recent.get('overview') or recent.get('theme', '')
+    overview = recent.get('theme', '')
     poster = render_dm_carousel(recent, recent.get('title', '展示会DM'))
     return f"""
     <article class="simple-card glass-card exhibition-card recent-card">
@@ -725,7 +724,7 @@ def render_exhibition_archive(items: list[dict[str, Any]]) -> str:
     cards = []
     for item in items:
         poster = render_dm_carousel(item, item.get('title', '展示会DM'))
-        overview = item.get('overview') or item.get('theme', '')
+        overview = item.get('theme', '')
         cards.append(
             f"""
             <article class="simple-card glass-card exhibition-card archive-card">
