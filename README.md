@@ -29,7 +29,7 @@ AI エージェントに作業を頼むときの決まりごとは [`AGENTS.md`]
 GitHub Actions（.github/workflows/deploy.yml）
     │
     ├── ① scripts/fetch_google_content.py
-    │       スプレッドシート → build/runtime/content_snapshot.json
+    │       スプレッドシート（_PublishedState と ChangeLog）→ build/runtime/content_snapshot.json
     │       Drive の画像 → build/runtime/assets/
     │       （サービスアカウントで、読み取り専用で読む）
     │
@@ -226,8 +226,15 @@ homepage/
 | `normalize_change_log()` | 更新履歴 |
 | `download_ordered_images_by_ids()` | 管理画面で並べた順（`media_file_ids`）に画像を取得 |
 | `download_folder_images()` | 並び順の情報がないときに、フォルダの画像をまとめて取得 |
+| `read_published_payload()` | `_PublishedState` から公開中の内容を読む（分けて書かれたセルをつなぎ直す） |
+| `tables_from_published()` | 読んだ内容を、以前の内容のシートの行と同じ形にする |
 
-読むシートは `Recruit`、`ActivityArticles`、`Exhibitions`、`RequestCases`、`ChangeLog` です（各シートの列は homepage-cms の README の「スプレッドシートの構成」）。
+読むシートは `_PublishedState` と `ChangeLog` です（各シートの列は homepage-cms の README の「スプレッドシートの構成」）。
+
+- **内容は `_PublishedState` から読みます**（`read_published_payload`）。管理画面が公開のたびに、公開した内容全体を JSON で書くシートです。1つのセルに入りきらないとき（45,000文字超）は、管理画面が20,000文字ずつ横の列（`payload_json_2`…）に分けて書き、`payload_json` には `{"storage_format": "chunked-json-v1", "chunk_count": n}` を書きます。読むときにつなぎ直します。
+- 読んだ内容は `tables_from_published` で、以前の内容のシート（`Recruit`・`ActivityArticles`・`Exhibitions`・`RequestCases`）の行と同じ形に直し、`normalize_…` の関数に渡します。
+- `_PublishedState` がない・読めないときは、以前の内容のシートから読みます（ビルドの記録に `Content: content sheets` と出ます）。管理画面がまだ以前の版のときや、移行の途中のための逃げ道です。
+- 2026年10月に、同じ内容から両方の読み方で作ったサイトのデータが一致することを、本番のデータで確かめました。
 
 ### `scripts/build_site.py`
 

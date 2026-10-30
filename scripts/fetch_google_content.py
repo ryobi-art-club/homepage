@@ -28,6 +28,8 @@ SHEETS_RANGE_MAP = {
     'RequestCases': 'RequestCases!A1:Z2000',
     'ChangeLog': 'ChangeLog!A1:Z2000',
 }
+# The CMS keeps the whole published content as JSON in this sheet (see read_published_tables)
+PUBLISHED_STATE_RANGE = "'_PublishedState'"
 
 
 def now_iso() -> str:
@@ -244,6 +246,94 @@ def list_folder_files(drive, folder_id: str) -> list[dict[str, Any]]:
     return drive.list_folder(folder_id)
 
 
+def parse_bool_value(value: Any) -> bool:
+    return value is True or parse_bool(value)
+
+
+def read_published_payload(sheets, spreadsheet_id: str) -> dict[str, Any] | None:
+    """The content the CMS published last, from the payload_json cells of _PublishedState.
+
+    A payload longer than one cell allows is split by the CMS (buildPayloadCells_ in homepage-cms/Store.js):
+    payload_json then holds {"storage_format": "chunked-json-v1", "chunk_count": n} and the columns
+    payload_json_2 … payload_json_{n+1} hold the pieces, each written as a JSON string."""
+    rows = get_sheet_rows(sheets, spreadsheet_id, PUBLISHED_STATE_RANGE)
+    if not rows or not rows[0].get('payload_json'):
+        return None
+    row = rows[0]
+    try:
+        payload = json.loads(row['payload_json'])
+        if payload.get('storage_format') == 'chunked-json-v1':
+            count = payload.get('chunk_count')
+            if not isinstance(count, int) or count < 1:
+                raise ValueError('invalid chunk count')
+            pieces = [json.loads(row.get(f'payload_json_{index + 2}', '')) for index in range(count)]
+            if not all(isinstance(piece, str) for piece in pieces):
+                raise ValueError('invalid chunk')
+            payload = json.loads(''.join(pieces))
+    except (ValueError, TypeError, AttributeError) as error:
+        print(f'Could not read _PublishedState ({error}); reading the content sheets instead')
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def tables_from_published(payload: dict[str, Any]) -> dict[str, list[dict[str, str]]]:
+    """The published content as rows shaped like the old content sheets, so the normalize_* functions
+    read both the same way."""
+    def flag(value: Any) -> str:
+        return 'TRUE' if parse_bool_value(value) else 'FALSE'
+
+    def text(value: Any) -> str:
+        return '' if value is None else str(value)
+
+    def folder(item: dict[str, Any]) -> str:
+        return text(item.get('mediaFolderId') or item.get('folderId') or item.get('photoFolderId') or item.get('driveFolderId'))
+
+    return {
+        'Recruit': [{
+            'year': text(item.get('year')),
+            'media_folder_id': folder(item),
+            'media_file_ids': json.dumps(item.get('mediaFileIds') or []),
+            'published': flag(item.get('published')),
+        } for item in payload.get('recruitCalendars') or []],
+        'ActivityArticles': [{
+            'article_id': text(item.get('articleId')),
+            'title': text(item.get('title')),
+            'category': text(item.get('category')),
+            'body': text(item.get('body')),
+            'media_folder_id': folder(item),
+            'media_file_ids': json.dumps(item.get('mediaFileIds') or []),
+            'published': flag(item.get('published', True)),
+            'created_at': text(item.get('createdAt')),
+        } for item in payload.get('activityArticles') or []],
+        'Exhibitions': [{
+            'exhibition_id': text(item.get('exhibitionId')),
+            'title': text(item.get('title')),
+            'subtitle': text(item.get('subtitle')),
+            'theme': text(item.get('theme')),
+            'venue_name': text(item.get('venueName')),
+            'venue_address': text(item.get('venueAddress')),
+            'date_line': text(item.get('dateLine')),
+            'time_line': text(item.get('timeLine')),
+            'display_bucket': text(item.get('displayBucket')),
+            'media_folder_id': folder(item),
+            'dm_file_ids': json.dumps(item.get('dmFileIds') or []),
+            'work_files': json.dumps(item.get('workFiles') or item.get('works') or []),
+            'published': flag(item.get('published', True)),
+            'start_date': text(item.get('startDate')),
+        } for item in payload.get('exhibitions') or []],
+        'RequestCases': [{
+            'case_id': text(item.get('caseId')),
+            'title': text(item.get('title')),
+            'body': text(item.get('body')),
+            'media_folder_id': folder(item),
+            'media_file_ids': json.dumps(item.get('mediaFileIds') or []),
+            'sort_order': text(item.get('sortOrder')),
+            'published': flag(item.get('published', True)),
+        } for item in payload.get('requestCases') or []],
+        'PublishControl': [],
+    }
+
+
 # Every file the published rows point at, so their metadata can be read in a few batch requests
 def referenced_file_ids(tables: dict[str, list[dict[str, str]]]) -> list[str]:
     ids = []
@@ -447,7 +537,15 @@ def main() -> None:
     ensure_dir(assets_dir)
     ensure_dir(output_json.parent)
 
-    tables = {name: get_sheet_rows(sheets, spreadsheet_id, range_name) for name, range_name in SHEETS_RANGE_MAP.items()}
+    # The content sheets (Recruit, ActivityArticles, …) are read only when _PublishedState cannot be
+    published = read_published_payload(sheets, spreadsheet_id)
+    if published is not None:
+        tables = tables_from_published(published)
+        tables['ChangeLog'] = get_sheet_rows(sheets, spreadsheet_id, SHEETS_RANGE_MAP['ChangeLog'])
+        print('Content: _PublishedState')
+    else:
+        tables = {name: get_sheet_rows(sheets, spreadsheet_id, range_name) for name, range_name in SHEETS_RANGE_MAP.items()}
+        print('Content: content sheets')
     drive.prefetch_meta(referenced_file_ids(tables))
     snapshot = {
         'meta': {'generated_at': now_iso()},
