@@ -112,7 +112,7 @@ python scripts/fetch_google_content.py \
   --service-account-json <鍵ファイルのパス> \
   --content-spreadsheet-id <コンテンツ用スプレッドシートの ID> \
   --output-json build/runtime/content_snapshot.json \
-  --assets-dir build/runtime/assets
+  --assets-dir build/runtime/assets   --cache-dir build/cache/drive    # 省略できる。付けると、2回目から変わった画像だけを取得する
 
 # ② HTML を作る
 python scripts/build_site.py \
@@ -136,8 +136,17 @@ python -m http.server 8000
 
 | ジョブ | 内容 |
 |---|---|
-| `build` | Python の準備 → 内容の取得 → HTML を作る → GitHub Pages 用にまとめる |
+| `build` | Python の準備 → 前回の画像のキャッシュを戻す → 内容の取得 → HTML を作る → GitHub Pages 用にまとめる → 画像のキャッシュを保存し、古いキャッシュを消す |
 | `deploy` | GitHub Pages に公開する |
+
+### 画像のキャッシュ
+
+ビルドで一番時間がかかるのは、Drive からの画像の取得です（2026年10月の時点で、3分のうち2分40秒）。画像は展示会ごとに増え続けるので、前回のビルドで取得した画像を GitHub Actions のキャッシュ（`drive-images-…`）に取っておき、**新しい画像と、Drive で中身が変わった画像だけ**を取得します（Drive のチェックサム `md5Checksum` で判定）。取得は8枚ずつ同時に行い、ファイルの情報は100件ずつまとめて問い合わせます。
+
+- **キャッシュには、今のサイトに載っている画像だけを入れます。** 公開リポジトリのキャッシュは、プルリクエストを作れる人（GitHub のアカウントがあれば誰でも）なら中身を読めるためです（[GitHub の説明](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching)）。取得の最後に、サイトに使わなかった画像をキャッシュから消し（`prune_cache`）、保存したあとで前回までのキャッシュを消します。非公開にした・削除した画像は、次のビルドでキャッシュからなくなります。
+- **すぐに消したいとき**（作品を消してほしいと頼まれたときなど）：管理画面で非公開にして公開したあと、GitHub の「Actions」→ 左のメニューの「Caches」で `drive-images-` のキャッシュを消してください。消しても、次のビルドが画像を全部取得し直すだけで、困ることはありません。古いキャッシュを消す手順が失敗した場合も、使われないキャッシュは7日で GitHub が消します。
+- ビルドの記録（ログ）には、`Images: 120 used, 3 downloaded, 117 from cache, 2 removed from cache` のように、取得した枚数だけが出ます。
+- 完成したサイト一式（Pages 用にまとめたもの）も、GitHub に1日だけ残ります。中身は公開したサイトそのものです。
 
 リポジトリの「Settings」→「Secrets and variables」→「Actions」に、次のシークレットが必要です。
 
@@ -207,6 +216,8 @@ homepage/
 | 関数 | 役割 |
 |---|---|
 | `build_clients()` | サービスアカウントの鍵から、スプレッドシートと Drive を読む準備をする（読み取り専用） |
+| `DriveFiles` | Drive の読み取り。ファイルの情報をまとめて問い合わせ（`prefetch_meta`）、画像を同時に取得し（`download`・`finish`）、キャッシュを整理する（`prune_cache`） |
+| `referenced_file_ids()` | シートの行が指している画像のファイル ID を集める（情報をまとめて問い合わせるため） |
 | `get_sheet_rows()` | シートの各行を、1行目の見出しを名前にして読む |
 | `normalize_recruit_calendar()` | 公開中の新歓カレンダーと画像 |
 | `normalize_activity_articles()` | 公開中の活動記録と画像 |

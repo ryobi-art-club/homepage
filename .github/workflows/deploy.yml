@@ -9,6 +9,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write # to delete the previous image cache
+    env:
+      IMAGE_CACHE_KEY: drive-images-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -17,6 +22,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+          cache: pip
 
       - name: Install Python dependencies
         run: pip install -r requirements.txt
@@ -25,13 +31,22 @@ jobs:
         run: |
           printf '%s' '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > /tmp/service-account.json
 
+      # Images downloaded by the previous build. The cache of a public repository can be read by anyone who
+      # opens a pull request, so it only ever holds the images on the current site (see README)
+      - name: Restore image cache
+        uses: actions/cache/restore@v4
+        with:
+          path: build/cache/drive
+          key: ${{ env.IMAGE_CACHE_KEY }}
+          restore-keys: drive-images-
+
       - name: Fetch Google content snapshot
         run: |
           python scripts/fetch_google_content.py \
             --service-account-json /tmp/service-account.json \
             --content-spreadsheet-id '${{ secrets.CONTENT_SPREADSHEET_ID }}' \
             --output-json build/runtime/content_snapshot.json \
-            --assets-dir build/runtime/assets
+            --assets-dir build/runtime/assets             --cache-dir build/cache/drive
 
       - name: Build static site
         run: |
@@ -45,6 +60,22 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+
+      # The fetch step removed the images that left the site; save the rest and delete the older caches.
+      # A failure here only makes the next build slower, so it does not stop the deploy
+      - name: Save image cache
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: build/cache/drive
+          key: ${{ env.IMAGE_CACHE_KEY }}
+
+      - name: Delete older image caches
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh cache list --repo "$GITHUB_REPOSITORY" --key drive-images- --limit 100 --json key --jq '.[].key'             | { grep -vx "$IMAGE_CACHE_KEY" || true; }             | while read -r key; do gh cache delete "$key" --repo "$GITHUB_REPOSITORY"; done
 
   deploy:
     needs: build
