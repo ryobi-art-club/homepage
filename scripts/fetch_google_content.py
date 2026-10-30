@@ -242,9 +242,9 @@ def normalize_recruit_calendar(recruit_rows: list[dict[str, str]], drive, assets
     year = str(row.get('year', '')).strip()
     label = f'{year}年度 新歓イベントカレンダー' if year else '新歓イベントカレンダー'
     file_ids = parse_json_cell(row.get('media_file_ids', ''), [])
-    images = download_ordered_images_by_ids(drive, file_ids, assets_root, 'recruit', max_images=3)
+    images = download_ordered_images_by_ids(drive, file_ids, assets_root, 'recruit', max_images=10)
     if not images:
-        images = download_folder_images(drive, row.get('media_folder_id') or row.get('recruit_calendar_folder_id', ''), assets_root, 'recruit', max_images=3)
+        images = download_folder_images(drive, row.get('media_folder_id') or row.get('recruit_calendar_folder_id', ''), assets_root, 'recruit', max_images=10)
     return {
         'label': label,
         'year': year,

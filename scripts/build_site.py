@@ -138,7 +138,7 @@ def activity_category_label(value: str) -> str:
     return labels.get(str(value or 'record').strip().lower(), 'その他')
 
 
-def render_carousel(images: list[str], label: str, max_images: int = 10, extra_class: str = '') -> str:
+def render_carousel(images: list[str], label: str, max_images: int = 10, extra_class: str = '', style: str = '') -> str:
     if not images:
         return ''
     images = list(images)[:max_images]
@@ -169,7 +169,7 @@ def render_carousel(images: list[str], label: str, max_images: int = 10, extra_c
         dots_html = f'<div class="carousel-dots">{"".join(dots)}</div>'
     class_attr = f'carousel {extra_class}'.strip()
     return f"""
-    <div class="{escape(class_attr)}" data-carousel>
+    <div class="{escape(class_attr)}"{(' style="' + escape(style) + '"') if style else ''} data-carousel>
       <div class="carousel-viewport">
         <div class="carousel-track">
           {''.join(slides)}
@@ -631,10 +631,10 @@ def _read_jpeg_aspect(path: Path) -> float | None:
         return None
 
 
-def image_aspect(src: str) -> float:
+def image_aspect(src: str, default: float | None = 1.0) -> float | None:
     path = _resolve_asset_path(src)
     if not path:
-        return 1.0
+        return default
     suffix = path.suffix.lower()
     if suffix == '.svg':
         ratio = _read_svg_aspect(path)
@@ -645,7 +645,7 @@ def image_aspect(src: str) -> float:
     else:
         ratio = None
     if not ratio or ratio <= 0:
-        return 1.0
+        return default
     return max(0.35, min(3.2, ratio))
 
 
@@ -708,7 +708,16 @@ def render_recruit_calendar(calendar: dict[str, Any]) -> str:
     images = calendar.get('images', []) if calendar else []
     if not images:
         return '<div class="empty-message">現在公開中の新歓イベントカレンダー画像はありません。</div>'
-    return render_carousel(images, '新歓イベントカレンダー', extra_class='recruit-carousel')
+    # 枠の縦横比を2つ用意し、画面に合わせて CSS で切り替える(どの画像も切れずに収まる)。
+    #   横長の画面(大きさが画面の高さで決まる): いちばん横長の画像に合わせる(--carousel-ratio-wide)
+    #   縦長の画面(大きさが画面の幅で決まる): いちばん縦長の画像に合わせる(--carousel-ratio-tall)
+    # こうすると、どちらの画面でも、ある画像を大きくするために別の画像が小さくなることがない。
+    # パワーポイント(16:9)と Instagram 用(正方形・4:5)の画像を想定し、16:9〜4:5 に収める
+    known = [min(16 / 9, max(0.8, ratio)) for ratio in (image_aspect(image, None) for image in images[:10]) if ratio]
+    wide = max(known) if known else 16 / 9
+    tall = min(known) if known else 16 / 9
+    return render_carousel(images, '新歓イベントカレンダー', extra_class='recruit-carousel',
+                           style=f'--carousel-ratio-wide: {wide:.4f}; --carousel-ratio-tall: {tall:.4f}')
 
 def render_exhibition_archive(items: list[dict[str, Any]]) -> str:
     if not items:

@@ -680,11 +680,14 @@ a { color: inherit; }
 
 /* DMカルーセル(展示会ハガキ 100:148) */
 .dm-poster-wrap {
-  width: min(100%, 360px);
+  /* DM(100:148)が画面の高さに収まるよう、幅を画面の高さからも制限する */
+  width: min(100%, 360px, calc((100vh - 140px) / 1.48));
+  width: min(100%, 360px, calc((100svh - 140px) / 1.48));
   justify-self: end;
 }
 .upcoming-card .dm-poster-wrap {
-  width: min(100%, 470px);
+  width: min(100%, 470px, calc((100vh - 140px) / 1.48));
+  width: min(100%, 470px, calc((100svh - 140px) / 1.48));
   max-width: 470px;
   justify-self: end;
   align-self: center;
@@ -716,13 +719,20 @@ a { color: inherit; }
    カレンダーは文字が欠けると意味がないので、切り抜かずに枠内へ全体を収める
    (縦長の画像は左右に黒い余白が付く)。枠の高さが画面の70%を超えないよう幅も絞り、中央に置く */
 .recruit-carousel {
+  /* 枠の縦横比は build_site.py の render_recruit_calendar が画像から2つ決める。
+     横長の画面ではいちばん横長の画像に、縦長の画面ではいちばん縦長の画像に合わせる */
+  --carousel-ratio: var(--carousel-ratio-wide, 1.7778);
   width: 100%;
-  max-width: calc(70vh * 16 / 9);
+  /* 枠の高さが画面の高さの 70% に収まる幅にする(前後のボタンと点も、この幅に合わせて並ぶ) */
+  max-width: calc(70vh * var(--carousel-ratio));
   margin-inline: auto;
+}
+@media (orientation: portrait) {
+  .recruit-carousel { --carousel-ratio: var(--carousel-ratio-tall, 1.7778); }
 }
 .recruit-carousel .carousel-viewport { cursor: grab; background: #000; }
 .recruit-carousel .carousel-viewport:active { cursor: grabbing; }
-.recruit-carousel .carousel-slide { aspect-ratio: 16 / 9; }
+.recruit-carousel .carousel-slide { aspect-ratio: var(--carousel-ratio); }
 .recruit-carousel .carousel-slide img { object-fit: contain; }
 
 /* ---------- 展示会 ---------- */
@@ -833,19 +843,23 @@ a { color: inherit; }
   color: var(--text-soft);
   display: block;
 }
-/* 住所は Google マップへのリンク。押せることがわかるよう、地図アイコンと下線を付ける */
+/* 住所は Google マップへのリンク。押せることがわかるよう、地図アイコンを付け、下線は住所の文字にだけ引く */
 .venue-map-link {
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
   width: fit-content;
   color: var(--text-soft);
+  text-decoration: none;
+}
+.venue-map-link span {
   text-decoration: underline;
   text-decoration-color: rgba(255,255,255,0.4);
   text-underline-offset: 4px;
 }
 .venue-map-link i { color: var(--color-yellow); font-size: 0.9em; }
-.venue-map-link:hover { color: var(--color-white); text-decoration-color: var(--color-yellow); }
+.venue-map-link:hover { color: var(--color-white); }
+.venue-map-link:hover span { text-decoration-color: var(--color-yellow); }
 
 /* アーカイブ */
 .archive-list { display: grid; }
@@ -1319,7 +1333,8 @@ footer {
   .dm-poster-wrap,
   .upcoming-card .dm-poster-wrap {
     justify-self: center;
-    width: min(100%, 520px);
+    width: min(100%, 520px, calc((100vh - 140px) / 1.48));
+    width: min(100%, 520px, calc((100svh - 140px) / 1.48));
     max-width: 520px;
     margin: 0 auto;
   }
