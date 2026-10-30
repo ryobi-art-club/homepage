@@ -20,6 +20,7 @@ A full local build needs the service-account key and the spreadsheet ID (README 
 - **Never** commit, push, run the workflow, or send anything to an external service unless the maintainer explicitly asks in this conversation.
 - **Never** read or print credentials (service-account JSON, keys). They must never be committed (`.gitignore` covers common names).
 - Read sheet columns by header name and tolerate missing columns: the CMS and this site may be deployed in either order.
+- Some class names are assembled in code (e.g. `exhibition-{placement}-heading` in `build_site.py`). Before removing CSS as unused, search for the parts of the name too, and check the page at desktop and phone widths.
 - Images in `src/` are copied to `dist/` by explicit lines in `main()` of `build_site.py`; a new image needs a new copy line.
 - `requirements.txt` pins major-version upper bounds on purpose; raise them only after a local build works.
 - Preserve each file's line endings (several files are CRLF).

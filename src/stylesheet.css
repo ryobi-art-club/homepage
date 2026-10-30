@@ -733,7 +733,9 @@ a { color: inherit; }
 .archive-list > .glass-card:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
 .upcoming-list { display: grid; }
 .exhibition-heading { margin-bottom: 18px; }
-/* 見出しは PC では本文列の中、スマホではカード先頭に出す(build_site.py の render_exhibition_heading) */
+/* 見出しは PC では本文列の中、スマホではカード先頭に出す(build_site.py の render_exhibition_heading)。
+   クラス名は exhibition-{placement}-heading と組み立てているので、名前で検索しても見つからない */
+.exhibition-mobile-heading { display: none; }
 /* 行の上下の余白を削って、文字の上端を箱の上端に合わせる。
    横に並ぶDMの上端と文字の上端が揃い、DMがはみ出して見えないようにするため。
    text-box 未対応のブラウザでも line-height: 1 でほぼ揃う */
@@ -1373,7 +1375,9 @@ footer {
     margin: 0 auto 18px;
   }
 
-  /* 展示会カード: DM→本文の順にする */
+  /* 展示会カード: 見出しをカード先頭に出し、DM→本文の順にする */
+  .exhibition-mobile-heading { display: block; margin-bottom: 16px; }
+  .exhibition-desktop-heading { display: none; }
   .archive-hero .dm-poster-wrap {
     order: 1;
     justify-self: center;
