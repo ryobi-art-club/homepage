@@ -35,8 +35,8 @@ jobs:
         run: |
           printf '%s' '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > /tmp/service-account.json
 
-      # Images downloaded by the previous build. The cache of a public repository can be read by anyone who
-      # opens a pull request, so it only ever holds the images on the current site (see README)
+      # 前回のビルドで取得した画像。公開リポジトリのキャッシュは、プルリクエストを作れる人なら誰でも
+      # 読めるので、今のサイトに載っている画像だけを入れる（README の「画像のキャッシュ」）
       - name: Restore image cache
         uses: actions/cache/restore@v4
         with:
@@ -65,8 +65,8 @@ jobs:
         with:
           path: dist
 
-      # The fetch step removed the images that left the site; save the rest and delete the older caches.
-      # A failure here only makes the next build slower, so it does not stop the deploy
+      # 取得の手順で、サイトに使わなくなった画像はキャッシュから消してある。残りを保存し、古いキャッシュを消す。
+      # ここで失敗しても次のビルドが遅くなるだけなので、公開は止めない
       - name: Save image cache
         uses: actions/cache/save@v4
         continue-on-error: true

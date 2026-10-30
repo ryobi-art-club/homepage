@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
 import fetch_google_content as fetch  # noqa: E402
 
 
-# 版2の内容（管理画面が _PublishedState に書く形）
+# 管理画面が _PublishedState に書く内容（版2）
 CONTENT_V2 = {
     'formatVersion': 2,
     'recruitCalendars': [
@@ -40,27 +40,6 @@ CONTENT_V2 = {
         {'caseId': 'r1', 'title': '事例', 'body': '本文', 'mediaFolderId': 'fq', 'mediaFileIds': ['q1'], 'published': True},
     ],
 }
-
-
-def content_v1():
-    """同じ内容を版1（2026年10月までの形）で書いたもの。別名・番号・写しを含む。"""
-    v1 = json.loads(json.dumps(CONTENT_V2))
-    del v1['formatVersion']
-    v1['recruitCalendar'] = {'year': '2026', 'folderId': 'fr26'}
-    for item in v1['recruitCalendars']:
-        item['folderId'] = item['mediaFolderId']
-        item['label'] = item['year'] + '年度 新歓イベントカレンダー'
-    for item in v1['activityArticles']:
-        item['photoFolderId'] = item['mediaFolderId']
-    for item in v1['exhibitions']:
-        item['driveFolderId'] = item['mediaFolderId']
-        item['mapEmbedUrl'] = ''
-        # 保存されている順番と番号の順番が違っても、番号の順に読む
-        item['workFiles'] = [{'file_id': work['fileId'], 'sort_order': index + 1, 'title': work['title'], 'artist': work['artist']}
-                             for index, work in enumerate(item.pop('works'))][::-1]
-    v1['requestCases'] = [dict(item, photoFolderId=item['mediaFolderId'], sortOrder=index + 1)
-                          for index, item in enumerate(v1['requestCases'])][::-1]
-    return v1
 
 
 def published_state_rows(content, chunk=None):
@@ -114,9 +93,6 @@ class RecordingDrive:
     def meta(self, file_id):
         return {'id': file_id, 'name': file_id + '.jpg', 'mimeType': 'image/jpeg'}
 
-    def list_folder(self, folder_id):
-        return [{'id': folder_id + '-old', 'name': 'old.jpg', 'mimeType': 'image/jpeg'}]
-
     def download(self, file_id, destination):
         self.downloads.append((file_id, Path(destination).as_posix().split('/assets/')[-1]))
         self.cache_jobs[file_id] = None
@@ -165,13 +141,13 @@ class ReadContentTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             fetch.read_published_content(FakeSheets({'_PublishedState': rows}), 'id')
 
-    def test_version_1_is_read_as_version_2(self):
-        upgraded = fetch.upgrade_content(content_v1())
-        for name in ('activityArticles', 'exhibitions', 'requestCases', 'recruitCalendars'):
-            for item, expected in zip(upgraded[name], CONTENT_V2[name]):
-                for key, value in expected.items():
-                    self.assertEqual(item[key], value, f'{name}.{key}')
-        self.assertIs(fetch.upgrade_content(CONTENT_V2), CONTENT_V2)
+    def test_another_format_version_stops_the_build(self):
+        for version in (None, 3):
+            content = {k: v for k, v in CONTENT_V2.items() if k != 'formatVersion'}
+            if version:
+                content['formatVersion'] = version
+            with self.subTest(version=version), self.assertRaises(ValueError):
+                fetch.read_published_content(FakeSheets({'_PublishedState': published_state_rows(content)}), 'id')
 
 
 class BuildTest(unittest.TestCase):
@@ -186,17 +162,11 @@ class BuildTest(unittest.TestCase):
         self.assertIn(('w2', 'exhibitions/e1/002-w2.jpg'), drive.downloads)
         self.assertNotIn('c0', drive.prefetched, '公開していない年度の画像は取らない')
 
-    def test_version_1_and_version_2_make_the_same_site(self):
-        v2 = build_snapshot({'_PublishedState': published_state_rows(CONTENT_V2), 'ChangeLog': CHANGE_LOG})
-        v1 = build_snapshot({'_PublishedState': published_state_rows(content_v1(), chunk=300), 'ChangeLog': CHANGE_LOG})
-        self.assertEqual(v1[0], v2[0])
-        self.assertEqual(v1[1].downloads, v2[1].downloads)
-
-    def test_items_saved_before_images_were_registered_use_their_folder(self):
-        content = json.loads(json.dumps(CONTENT_V2))
-        content['activityArticles'][0]['mediaFileIds'] = []
-        snapshot, _ = build_snapshot({'_PublishedState': published_state_rows(content), 'ChangeLog': CHANGE_LOG})
-        self.assertEqual(snapshot['activities'][0]['images'], ['assets/activities/a1/old.jpg'])
+    def test_split_cells_make_the_same_site(self):
+        whole = build_snapshot({'_PublishedState': published_state_rows(CONTENT_V2), 'ChangeLog': CHANGE_LOG})
+        split = build_snapshot({'_PublishedState': published_state_rows(CONTENT_V2, chunk=300), 'ChangeLog': CHANGE_LOG})
+        self.assertEqual(split[0], whole[0])
+        self.assertEqual(split[1].downloads, whole[1].downloads)
 
 
 class Request:

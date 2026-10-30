@@ -31,8 +31,9 @@ A full local build needs the service-account key and the spreadsheet ID (README 
 ## Conventions
 
 - HTML is built with Python f-strings; escape every value from the snapshot with `escape()`.
-- The CMS has a preview pane that imitates this site (`homepage-cms/UiStyles.html`, "サイトプレビュー" section, and the preview renderers in `UiScript.html`). When you change how content looks here, mention that the CMS preview should be updated to match.
+- The CMS has a preview pane that imitates this site (`homepage-cms/UiStyles.html`, "サイトプレビュー" section, and the preview renderers in `UiPreview.html`). When you change how content looks here, mention that the CMS preview should be updated to match.
 - Keep pages light: no embedded third-party widgets (maps are plain links to Google Maps search URLs).
+- Comments are in Japanese, and only for what the code cannot say (a reason, an agreement with the CMS, a past incident). Prefer clearer names and structure over a comment, and keep consistent with how the rest of the code does the same thing.
 
 ## Working with the maintainer
 
