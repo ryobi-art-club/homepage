@@ -14,7 +14,7 @@ python -m py_compile scripts/build_site.py scripts/fetch_google_content.py
 python -m unittest discover tests     # no Google access needed; the workflow runs it before every build
 ```
 
-The content comes from `_PublishedState` as JSON (format version 2; its shape is defined in homepage-cms README section 8-4 and `CONTENT_FIELDS` in `Store.js`). Older formats are read only through `upgrade_content`. Change both repositories together when the shape changes.
+The content comes from `_PublishedState` as JSON (format version 2; its shape is defined in homepage-cms README section 8-4 and `CONTENT_FIELDS` in `ContentModel.js`). Another format version stops the build (`read_published_content`). The update log comes from `ChangeLog`: one change per row (`kind`, `item_id`, `note`); the wording is built at render time from the current titles (`CHANGE_LOG_TEXT`, mirrored by `CHANGE_LOG_ITEM_LISTS` in the CMS `ContentHistory.js`). Change both repositories together when either shape or the wording changes.
 
 A full local build needs the service-account key and the spreadsheet ID (README section 4). **Do not look for or read the key yourself**; ask the maintainer to run the fetch step. Rendering functions can be checked without Google access by importing `scripts/build_site.py` and calling them with small dicts.
 

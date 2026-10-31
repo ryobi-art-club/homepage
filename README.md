@@ -186,7 +186,7 @@ INFORMATION（#info-tabs）：タブで切り替え
 - **作品一覧**は、登録した順に行ごとに並べ、1行の高さをそろえて、幅を画像の縦横比に合わせます（`render_work_gallery` と CSS の `.work-gallery`）。
 - **記事や事例の写真**は最大10枚まで使い、4枚まで並べて、それ以上は「+N」と表示します。押すと拡大表示（ライトボックス）になります。
 - **新歓カレンダー・DM** はスライド表示です。新歓カレンダーは10枚まで出します。枠の縦横比は、横長の画面（パソコンなど）ではいちばん横長の画像に、縦長の画面（スマホなど）ではいちばん縦長の画像に合わせます（16:9〜4:5）。横長の画面では大きさが画面の高さで、縦長の画面では画面の幅で決まるので、こうするとどの画像も切れずに、いちばん大きく表示されます。パワーポイントの横長の画像も、Instagram 用の正方形・縦長の画像も使えます。DM は、画面の高さに収まる大きさにします。
-- **更新履歴**は、今も公開中の項目に関係するものだけを表示します。
+- **更新履歴**は、今も公開中の項目に関係するものだけを表示します。`ChangeLog` には変更の種類と項目の ID だけがあり、文言は表示するときに今のタイトルで作ります（`change_log_text`）。そのため、項目の名前を変えると過去の行も新しい名前で出ます。文言（`CHANGE_LOG_TEXT`）は管理画面の `ContentHistory.js` の `CHANGE_LOG_ITEM_LISTS` と同じにし、変えるときは両方を一緒に直します。
 - **検索エンジン向け**：タイトル、説明、SNS で共有したときの表示、`sitemap.xml` を自動で作ります。`src/verification/` の HTML は Google Search Console の所有確認用で、そのまま公開されます。
 
 ---
@@ -233,7 +233,7 @@ homepage/
 | `normalize_activity_articles()` | 公開中の活動記録と画像 |
 | `normalize_requests()` | 公開中のご依頼事例と画像 |
 | `normalize_exhibitions()` | 公開中の展示会を開催予定とアーカイブに分け、DM・作品の画像を取得 |
-| `normalize_change_log()` | 更新履歴 |
+| `normalize_change_log()` | 更新履歴の行（版2：`kind`・`item_id`・`note`）。管理画面が版2に書き直すまでは、版1の文章（`summary`）の行も読む |
 
 読むシートは `_PublishedState` と `ChangeLog` です（各シートの列は homepage-cms の README の「スプレッドシートの構成」）。
 
@@ -248,7 +248,7 @@ homepage/
 |---|---|
 | `render_page()` | ページ全体を組み立てる |
 | `build_seo_context()` / `render_sitemap_xml()` | 検索エンジン向けの情報と sitemap |
-| `render_update_log()` | 更新履歴 |
+| `render_update_log()` / `change_log_text()` | 更新履歴。日ごとにまとめ、同じ日の同じ文言は1つにする |
 | `render_exhibition_upcoming()` / `render_exhibition_recent()` / `render_exhibition_archive()` | 展示会（開催予定・直近・過去） |
 | `render_exhibition_meta()` / `render_venue_address()` | 展示会の会期と会場。住所を Google マップへのリンクにする |
 | `render_work_gallery()` | 作品一覧 |

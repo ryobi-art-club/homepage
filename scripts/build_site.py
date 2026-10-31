@@ -237,6 +237,27 @@ def render_image_grid(images: list[str], label: str, gallery_id: str) -> str:
     )
 
 
+# 更新履歴の文言。管理画面（ContentHistory.js の CHANGE_LOG_ITEM_LISTS）と同じにする（homepage-cms の README「8-4」）
+CHANGE_LOG_RECRUIT_TEXT = '新歓イベントカレンダーを更新'
+CHANGE_LOG_TEXT = {
+    'activity': '活動記録・告知「{}」',
+    'request': '取り組み「{}」',
+    'exhibition': '展示会「{}」の情報を公開',
+}
+
+
+# 非公開・削除した項目の行は空（出さない）。titles は種類ごとの「ID → 今のタイトル」
+def change_log_text(entry: dict[str, Any], titles: dict[str, dict[str, str]]) -> str:
+    kind = entry.get('kind')
+    if kind == 'recruit':
+        return CHANGE_LOG_RECRUIT_TEXT
+    if kind == 'note':
+        return str(entry.get('note', ''))
+    title = titles.get(kind, {}).get(str(entry.get('item_id', '')))
+    return CHANGE_LOG_TEXT[kind].format(title) if title else ''
+
+
+# ---------- 版1（summary の文章）の更新履歴：管理画面が版2に書き直したら、ここから _canonical_public_summary までを消す ----------
 def _looks_legacy_summary_segment(segment: str) -> bool:
     return bool(
         segment == '新歓イベントカレンダーを更新'
@@ -289,27 +310,28 @@ def render_update_log(change_log: list[dict[str, Any]], data: dict[str, Any]) ->
     if not change_log:
         return '<div class="empty-message">まだ更新履歴はありません。</div>'
 
-    current_titles = {
-        'activity': {str(item.get('title', '')) for item in data.get('activities', [])},
-        'request': {str(item.get('title', '')) for item in data.get('requests', [])},
-        'exhibition': set(),
-    }
     exhibitions = data.get('exhibitions', {}) or {}
     upcoming_items = exhibitions.get('upcoming', []) or []
     if isinstance(upcoming_items, dict):
         upcoming_items = [upcoming_items]
-    for item in upcoming_items:
-        if item and item.get('title'):
-            current_titles['exhibition'].add(str(item.get('title')))
-    for item in exhibitions.get('archive', []) or []:
-        if item and item.get('title'):
-            current_titles['exhibition'].add(str(item.get('title')))
+    exhibition_items = [item for item in upcoming_items + (exhibitions.get('archive', []) or []) if item and item.get('title')]
+    titles = {
+        'activity': {str(item.get('id', '')): str(item.get('title', '')) for item in data.get('activities', []) if item.get('title')},
+        'request': {str(item.get('id', '')): str(item.get('title', '')) for item in data.get('requests', []) if item.get('title')},
+        'exhibition': {str(item.get('id', '')): str(item.get('title')) for item in exhibition_items},
+    }
+    current_titles = {kind: set(by_id.values()) for kind, by_id in titles.items()}
 
     grouped: OrderedDict[str, OrderedDict[str, None]] = OrderedDict()
     ordered_entries = sorted(change_log, key=lambda entry: str(entry.get('timestamp', '')), reverse=True)
     for entry in ordered_entries:
         date_key = fmt_date(str(entry.get('timestamp', '')))
         grouped.setdefault(date_key, OrderedDict())
+        if 'kind' in entry:
+            text = change_log_text(entry, titles)
+            if text:
+                grouped[date_key][text] = None
+            continue
         for segment in _split_summary_segments(str(entry.get('summary', ''))):
             kind, title = _segment_public_key(segment)
             if kind == 'recruit':

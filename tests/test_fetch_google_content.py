@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
+import build_site  # noqa: E402
 import fetch_google_content as fetch  # noqa: E402
 
 
@@ -122,7 +123,7 @@ def build_snapshot(sheet_values):
     return snapshot, drive
 
 
-CHANGE_LOG = [['timestamp', 'summary', 'actor_name'], ['2026-10-30T00:00:00.000Z', '展示会「展示」の情報を公開', 'A']]
+CHANGE_LOG = [['timestamp', 'kind', 'item_id', 'note', 'actor_name'], ['2026-10-30T00:00:00.000Z', 'exhibition', 'e1', '', 'A']]
 
 
 class ReadContentTest(unittest.TestCase):
@@ -158,7 +159,7 @@ class BuildTest(unittest.TestCase):
         self.assertEqual([item['id'] for item in snapshot['requests']], ['r2', 'r1'], '並べた順のまま')
         self.assertEqual([work['title'] for work in snapshot['exhibitions']['upcoming'][0]['works']], ['一', '二'])
         self.assertEqual(snapshot['exhibitions']['archive'][0]['id'], 'e2')
-        self.assertEqual(snapshot['change_log'][0]['summary'], '展示会「展示」の情報を公開')
+        self.assertEqual(snapshot['change_log'], [{'timestamp': '2026-10-30T00:00:00.000Z', 'kind': 'exhibition', 'item_id': 'e1', 'note': ''}])
         self.assertIn(('w2', 'exhibitions/e1/002-w2.jpg'), drive.downloads)
         self.assertNotIn('c0', drive.prefetched, '公開していない年度の画像は取らない')
 
@@ -167,6 +168,41 @@ class BuildTest(unittest.TestCase):
         split = build_snapshot({'_PublishedState': published_state_rows(CONTENT_V2, chunk=300), 'ChangeLog': CHANGE_LOG})
         self.assertEqual(split[0], whole[0])
         self.assertEqual(split[1].downloads, whole[1].downloads)
+
+
+class UpdateLogTest(unittest.TestCase):
+    """サイトの更新履歴：ChangeLog の行（1行に1つの変更）から、今の内容のタイトルで文言を作る"""
+
+    def site(self, rows):
+        snapshot, _ = build_snapshot({'_PublishedState': published_state_rows(CONTENT_V2), 'ChangeLog': rows})
+        return build_site.render_update_log(snapshot['change_log'], snapshot)
+
+    def bullets(self, html_text):
+        return [part.split('</li>')[0] for part in html_text.split('<li>')[1:]]
+
+    def test_current_titles_and_only_published_items(self):
+        header = ['timestamp', 'kind', 'item_id', 'note', 'actor_name']
+        html_text = self.site([header,
+                               ['2026-10-01T00:00:00.000Z', 'activity', 'a1', '', 'A'],
+                               ['2026-10-01T00:00:00.000Z', 'activity', 'a2', '', 'A'],
+                               ['2026-10-01T00:00:00.000Z', 'request', 'deleted', '', 'A'],
+                               ['2026-10-01T00:00:00.000Z', 'recruit', '', '', 'A'],
+                               ['2026-10-01T00:00:00.000Z', 'note', '', '部室を移りました', 'A'],
+                               ['2026-10-01T00:00:00.000Z', 'activity', 'a1', '', 'A'],
+                               ['2026-10-02T00:00:00.000Z', 'exhibition', 'e2', '', 'B']])
+        self.assertEqual(self.bullets(html_text), [
+            '展示会「過去」の情報を公開',
+            '活動記録・告知「記事」', '新歓イベントカレンダーを更新', '部室を移りました'])
+
+    def test_the_old_sentence_rows_show_the_same_until_the_cms_rewrites_them(self):
+        old = self.site([['timestamp', 'summary', 'actor_name'],
+                         ['2026-10-01T00:00:00.000Z', '活動記録・告知「記事」\n活動記録・告知「非公開の記事」', 'A'],
+                         ['2026-10-02T00:00:00.000Z', '展示会「過去」の情報を公開', 'B']])
+        new = self.site([['timestamp', 'kind', 'item_id', 'note', 'actor_name'],
+                         ['2026-10-01T00:00:00.000Z', 'activity', 'a1', '', 'A'],
+                         ['2026-10-01T00:00:00.000Z', 'activity', 'a2', '', 'A'],
+                         ['2026-10-02T00:00:00.000Z', 'exhibition', 'e2', '', 'B']])
+        self.assertEqual(old, new)
 
 
 class Request:
