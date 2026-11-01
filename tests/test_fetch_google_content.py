@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
-import build_site  # noqa: E402
+from sitebuild.sections import render_update_log  # noqa: E402
 import fetch_google_content as fetch  # noqa: E402
 
 
@@ -175,7 +175,7 @@ class UpdateLogTest(unittest.TestCase):
 
     def site(self, rows):
         snapshot, _ = build_snapshot({'_PublishedState': published_state_rows(CONTENT_V2), 'ChangeLog': rows})
-        return build_site.render_update_log(snapshot['change_log'], snapshot)
+        return render_update_log(snapshot['change_log'], snapshot)
 
     def bullets(self, html_text):
         return [part.split('</li>')[0] for part in html_text.split('<li>')[1:]]
@@ -193,16 +193,6 @@ class UpdateLogTest(unittest.TestCase):
         self.assertEqual(self.bullets(html_text), [
             '展示会「過去」の情報を公開',
             '活動記録・告知「記事」', '新歓イベントカレンダーを更新', '部室を移りました'])
-
-    def test_the_old_sentence_rows_show_the_same_until_the_cms_rewrites_them(self):
-        old = self.site([['timestamp', 'summary', 'actor_name'],
-                         ['2026-10-01T00:00:00.000Z', '活動記録・告知「記事」\n活動記録・告知「非公開の記事」', 'A'],
-                         ['2026-10-02T00:00:00.000Z', '展示会「過去」の情報を公開', 'B']])
-        new = self.site([['timestamp', 'kind', 'item_id', 'note', 'actor_name'],
-                         ['2026-10-01T00:00:00.000Z', 'activity', 'a1', '', 'A'],
-                         ['2026-10-01T00:00:00.000Z', 'activity', 'a2', '', 'A'],
-                         ['2026-10-02T00:00:00.000Z', 'exhibition', 'e2', '', 'B']])
-        self.assertEqual(old, new)
 
 
 class Request:

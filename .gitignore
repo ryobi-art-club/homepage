@@ -4,3 +4,5 @@ dist/
 # Never commit Google credentials
 *service-account*.json
 *-key.json
+tools/screenshot/out/
+tools/screenshot/node_modules/

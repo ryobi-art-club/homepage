@@ -1,0 +1,10 @@
+{
+  "name": "homepage-screenshot",
+  "private": true,
+  "description": "Builds the site from sample content and takes screenshots (not deployed)",
+  "devDependencies": {
+    "puppeteer-core": "23.11.1",
+    "pixelmatch": "5.3.0",
+    "pngjs": "7.0.0"
+  }
+}

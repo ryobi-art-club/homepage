@@ -10,27 +10,31 @@ The public website of the 凌美会 art club, built as one static page and publi
 
 ```bash
 pip install -r requirements.txt
-python -m py_compile scripts/build_site.py scripts/fetch_google_content.py
+python -m py_compile scripts/build_site.py scripts/fetch_google_content.py scripts/sitebuild/*.py
 python -m unittest discover tests     # no Google access needed; the workflow runs it before every build
+npm install --prefix tools/screenshot # once
+node tools/screenshot/shoot.cjs      # builds the site from tools/screenshot/sample-content.json and takes screenshots
+node tools/screenshot/compare.cjs --save <dir outside the repo>   # before a change that should not alter looks
+node tools/screenshot/compare.cjs <dir>                           # after it: pixel-by-pixel comparison
 ```
 
-The content comes from `_PublishedState` as JSON (format version 2; its shape is defined in homepage-cms README section 8-4 and `CONTENT_FIELDS` in `ContentModel.js`). Another format version stops the build (`read_published_content`). The update log comes from `ChangeLog`: one change per row (`kind`, `item_id`, `note`); the wording is built at render time from the current titles (`CHANGE_LOG_TEXT`, mirrored by `CHANGE_LOG_ITEM_LISTS` in the CMS `ContentHistory.js`). Change both repositories together when either shape or the wording changes.
+The content comes from `_PublishedState` as JSON (format version 2; its shape is defined in homepage-cms README section 8-4 and `CONTENT_FIELDS` in `ContentModel.js`). Another format version stops the build (`read_published_content`). The update log comes from `ChangeLog`: one change per row (`kind`, `item_id`, `note`); the wording is built at render time from the current titles (`CHANGE_LOG_TEXT` in `sitebuild/sections.py`, mirrored by `CHANGE_LOG_ITEM_LISTS` in the CMS `ContentHistory.js`). Change both repositories together when either shape or the wording changes.
 
-A full local build needs the service-account key and the spreadsheet ID (README section 4). **Do not look for or read the key yourself**; ask the maintainer to run the fetch step. Rendering functions can be checked without Google access by importing `scripts/build_site.py` and calling them with small dicts.
+A full local build needs the service-account key and the spreadsheet ID (README section 4). **Do not look for or read the key yourself**; ask the maintainer to run the fetch step. Rendering functions (`scripts/sitebuild/`) can be checked without Google access by importing them and calling them with small dicts, or with the sample-content screenshots above.
 
 ## Hard rules
 
 - **Never** commit, push, run the workflow, or send anything to an external service unless the maintainer explicitly asks in this conversation.
 - **Never** read or print credentials (service-account JSON, keys). They must never be committed (`.gitignore` covers common names).
 - Read sheet columns by header name and tolerate missing columns: the CMS and this site may be deployed in either order.
-- Some class names are assembled in code (e.g. `exhibition-{placement}-heading` in `build_site.py`). Before removing CSS as unused, search for the parts of the name too, and check the page at desktop and phone widths.
-- Images in `src/` are copied to `dist/` by explicit lines in `main()` of `build_site.py`; a new image needs a new copy line.
+- Some class names are assembled in code (e.g. `exhibition-{placement}-heading` and `image-count-{n}` in `sitebuild/sections.py`). Before removing CSS as unused, search for the parts of the name too, and check the page at desktop and phone widths.
+- Images in `src/` are copied to `dist/` by name (`STATIC_FILES` in `build_site.py`); a new image needs its name added there.
 - `requirements.txt` pins major-version upper bounds on purpose; raise them only after a local build works.
 - Preserve each file's line endings (several files are CRLF).
 
 ## Conventions
 
-- HTML is built with Python f-strings; escape every value from the snapshot with `escape()`.
+- HTML is built with `html(template, **values)` from `sitebuild/html.py`: values are escaped, `Markup` results and lists of them are inserted as is, `None`/`False` insert nothing, newlines plus indentation in the template are removed. Wrap only fixed markup from the code in `Markup(…)`. Do not build HTML with f-strings and `escape()`. The package is `sitebuild`, not `site` (that name is a Python standard module).
 - The CMS has a preview pane that imitates this site (`homepage-cms/UiStyles.html`, "サイトプレビュー" section, and the preview renderers in `UiPreview.html`). When you change how content looks here, mention that the CMS preview should be updated to match.
 - Keep pages light: no embedded third-party widgets (maps are plain links to Google Maps search URLs).
 - Comments are in Japanese, and only for what the code cannot say (a reason, an agreement with the CMS, a past incident). Prefer clearer names and structure over a comment, and keep consistent with how the rest of the code does the same thing.

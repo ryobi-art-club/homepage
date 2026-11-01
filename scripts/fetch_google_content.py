@@ -237,18 +237,10 @@ def item_images(drive, item: dict[str, Any], assets_root: Path, group: str) -> l
     return images
 
 
-# 更新履歴（ChangeLog）の版2は、1行に1つの変更（kind・item_id・note）。表示する文言は build_site.py が作る。
-# 版1（summary の文章）は、管理画面が次の公開で版2に書き直すまでのあいだだけ読む（書き直したら版1の分は消す）
+# 更新履歴（ChangeLog）は1行に1つの変更（kind・item_id・note）。表示する文言は build_site.py が作る
 def normalize_change_log(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
-    items = []
-    for row in rows:
-        if not row.get('timestamp'):
-            continue
-        if 'kind' in row:
-            if row.get('kind'):
-                items.append({'timestamp': row['timestamp'], 'kind': row['kind'], 'item_id': row.get('item_id', ''), 'note': row.get('note', '')})
-        elif row.get('summary'):
-            items.append({'timestamp': row['timestamp'], 'summary': row['summary']})
+    items = [{'timestamp': row['timestamp'], 'kind': row['kind'], 'item_id': row.get('item_id', ''), 'note': row.get('note', '')}
+             for row in rows if row.get('timestamp') and row.get('kind')]
     # 同じ日時の行（1回の公開の変更）は、シートの順のまま
     return sorted(items, key=lambda x: x['timestamp'], reverse=True)
 

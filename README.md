@@ -58,7 +58,7 @@ GitHub Actions（.github/workflows/deploy.yml）
 | ご依頼の方：連絡先 | `site_static.json` の `requests_static` |
 | SNS のリンク、コピーライト | `site_static.json` の `social_links`、`copyright` |
 | ロゴ、部室の写真 | `src/logo.png`、`src/clubroom.jpg` |
-| デザイン・動き | `src/stylesheet.css`、`src/site.js`、`scripts/build_site.py`（[3](#3-デザインや動きを変えるとき)） |
+| デザイン・動き | `src/stylesheet.css`、`src/site.js`、`scripts/sitebuild/`（[3](#3-デザインや動きを変えるとき)） |
 
 ### `site_static.json` の項目
 
@@ -86,13 +86,14 @@ GitHub Actions（.github/workflows/deploy.yml）
 
 ### 写真を増やすときの注意
 
-`src/` の画像は、ビルドの最後に `build_site.py` の `main()` が**ファイル名を指定して** `dist/` にコピーしています（`logo.png`、`clubroom.jpg`）。写真を増やしたら、ここにもコピーの行を足してください。足さないと、サイトで画像が表示されません。
+`src/` の画像は、ビルドの最後に `build_site.py` が**ファイル名を指定して** `dist/` にコピーしています（`STATIC_FILES` の `logo.png`、`clubroom.jpg`）。写真を増やしたら、ここにも名前を足してください。足さないと、サイトで画像が表示されません。
 
 ---
 
 ## 3. デザインや動きを変えるとき
 
-- HTML は `scripts/build_site.py` が Python で組み立てています（テンプレートの仕組みは使っていません）。
+- HTML は `scripts/sitebuild/` が Python で組み立てています（外部のテンプレートの仕組みは使っていません）。HTML は `html()`（`sitebuild/html.py`）で作ります。`{名前}` に入れた値は文字として表示されるように書き換わるので、内容に `<` や `"` があってもページは崩れません。管理画面の画面の作り方（`html`…`` ）と同じ考え方です。
+- 見た目を変えないはずの作業（整理など）では、作業の前後で `tools/screenshot/` の撮影を比べます（[4](#4-手元でのビルドと確認)）。
 - 見た目は `src/stylesheet.css`、動き（タブ、写真の拡大表示、スライド）は `src/site.js` です。外部のライブラリは使っていません（アイコンだけ Font Awesome を読み込んでいます）。
 - 管理画面の右側の「プレビュー」は、このサイトの見た目をまねて作っています（homepage-cms の `UiStyles.html` の「サイトプレビュー」の部分）。サイトの見た目を変えたら、管理画面のプレビューも合わせて直すと、部員が公開前に確認しやすくなります。
 - 変えたら、手元でビルドして確認します（[4](#4-手元でのビルドと確認)）。
@@ -134,7 +135,18 @@ python -m http.server 8000
 python -m unittest discover tests
 ```
 
-`tests/test_fetch_google_content.py` は、`_PublishedState` の読み方（セルを分けた形を含む）、版が違う内容で止まること、サイトのデータの作り方、画像のキャッシュを確かめます。
+`tests/test_fetch_google_content.py` は、`_PublishedState` の読み方（セルを分けた形を含む）、版が違う内容で止まること、サイトのデータの作り方、更新履歴の表示、画像のキャッシュを確かめます。
+
+**見本のデータでの撮影**：鍵がなくても、見本のデータ（`tools/screenshot/sample-content.json`）でサイトを作り、パソコン・タブレット・スマホ・スマホ横向きで撮影できます。Chrome と Node.js が必要です。見た目を変えないはずの作業では、作業の前後の画像を1画素ずつ比べます。
+
+```bash
+npm install --prefix tools/screenshot
+node tools/screenshot/shoot.cjs                       # tools/screenshot/out/shots/ に保存
+node tools/screenshot/compare.cjs --save <控えのフォルダ>   # 作業の前に控えを取る（リポジトリの外に置く）
+node tools/screenshot/compare.cjs <控えのフォルダ>          # 作業のあとに比べる
+```
+
+撮影は、動きを減らす設定（`prefers-reduced-motion`）で行います。スライドショーなどの時間で動く表示が止まり、何度撮っても同じ画像になります。画面の横はみ出しと、画面のエラーも報告します。
 
 ---
 
@@ -197,7 +209,7 @@ INFORMATION（#info-tabs）：タブで切り替え
 |---|---|
 | Python のライブラリ | `requirements.txt` は大きな版上げで壊れないよう上限（`<3` など）を付けています。上限を上げるときは、手元でビルドして確かめてから |
 | GitHub Actions の部品 | 実行結果に古い版の警告が出たら、`deploy.yml` の `actions/checkout@v5` などを上げる |
-| Font Awesome | `build_site.py` で 6.4.2 を読み込んでいる |
+| Font Awesome | `scripts/sitebuild/page.py` で 6.4.2 を読み込んでいる |
 | サービスアカウントの鍵 | 使えなくなったら新しい鍵を作り、シークレット `GOOGLE_SERVICE_ACCOUNT_JSON` を入れ替える |
 
 ---
@@ -210,7 +222,13 @@ homepage/
 ├── .github/workflows/deploy.yml  ビルドと公開のワークフロー
 ├── scripts/
 │   ├── fetch_google_content.py   スプレッドシート・Drive → JSON と画像
-│   └── build_site.py             JSON → HTML
+│   ├── build_site.py             JSON → HTML（入口：読み込み・書き出し・コピー）
+│   └── sitebuild/
+│       ├── html.py               HTML を作る道具（html()・rich_text()）
+│       ├── sections.py           部品ごとの HTML（更新履歴・展示会・記事・入部案内・ヒーロー）
+│       ├── page.py               ページ全体の組み立てと SEO
+│       └── images.py             画像の縦横比の読み取り
+├── tools/screenshot/             見本のデータでの撮影と比較（Node.js。公開しない）
 └── src/
     ├── site_static.json          固定の文章
     ├── stylesheet.css            見た目
@@ -233,7 +251,7 @@ homepage/
 | `normalize_activity_articles()` | 公開中の活動記録と画像 |
 | `normalize_requests()` | 公開中のご依頼事例と画像 |
 | `normalize_exhibitions()` | 公開中の展示会を開催予定とアーカイブに分け、DM・作品の画像を取得 |
-| `normalize_change_log()` | 更新履歴の行（版2：`kind`・`item_id`・`note`）。管理画面が版2に書き直すまでは、版1の文章（`summary`）の行も読む |
+| `normalize_change_log()` | 更新履歴の行（`kind`・`item_id`・`note`） |
 
 読むシートは `_PublishedState` と `ChangeLog` です（各シートの列は homepage-cms の README の「スプレッドシートの構成」）。
 
@@ -242,10 +260,36 @@ homepage/
 - `formatVersion` が今の版（2）でない内容は読まずに、ビルドを止めます。形を変えるときは、管理画面と一緒に版を上げます（homepage-cms の README「8-4」の「形の版」）。
 - 並び順は、管理画面で並べた一覧の順番のままです（ご依頼事例・作品）。
 
-### `scripts/build_site.py`
+### `scripts/build_site.py` と `scripts/sitebuild/`
 
-| 関数 | 役割 |
+| 場所 | 関数 | 役割 |
+|---|---|---|
+| `build_site.py` | `main()` | 全体の流れ。最後に `src/` のファイルを `dist/` にコピーする（[写真を増やすときの注意](#写真を増やすときの注意)） |
+| `page.py` | `render_page()` | ページ全体を組み立てる |
+| `page.py` | `build_seo_context()` / `render_sitemap_xml()` | 検索エンジン向けの情報と sitemap |
+| `sections.py` | `render_update_log()` / `change_log_text()` | 更新履歴。日ごとにまとめ、同じ日の同じ文言は1つにする |
+| `sections.py` | `render_exhibition_card()`（`render_exhibition_upcoming()` / `_recent()` / `_archive()` から使う） | 展示会のカード（開催予定・直近・過去） |
+| `sections.py` | `render_exhibition_meta()` / `render_venue_address()` | 展示会の会期と会場。住所を Google マップへのリンクにする |
+| `sections.py` | `render_work_gallery()` | 作品一覧 |
+| `sections.py` | `render_activity_cards()` / `render_request_cards()` | 活動記録・ご依頼事例 |
+| `sections.py` | `render_image_grid()` / `render_carousel()` / `render_recruit_calendar()` | 写真の並べ方・スライド |
+| `sections.py` | `render_timeline()` / `render_info_points()` / `render_material_chips()` | 年間スケジュール・入部の基本情報・画材 |
+| `sections.py` | `render_hero()` | ページの先頭（直近の展示会の作品のスライドショー） |
+| `html.py` | `html()` / `rich_text()` | HTML を作る。改行を `<br>` に、`[文字](URL)` をリンクにする |
+| `images.py` | `image_aspect()` | 画像の縦横比を読む（並べ方の調整に使う） |
+
+管理画面のプレビュー（homepage-cms の `UiPreview.html`）は、この部品をまねています。対応する関数は次のとおりです。
+
+| サイト（`sections.py`） | 管理画面のプレビュー（`UiPreview.html`） |
 |---|---|
+| `render_exhibition_card()` | `buildExhibitionPreviewCardHtml()` |
+| `render_exhibition_meta()` | `buildMetaListHtml()` |
+| `render_work_gallery()` | `buildWorkGalleryPreviewHtml()` |
+| `render_activity_cards()` / `render_request_cards()` | `buildArticlePreviewHtml()` |
+| `render_image_grid()` / `render_carousel()` | `buildThumbCarouselHtml()` |
+| `render_recruit_calendar()` | `buildRecruitPreviewHtml()` |
+
+---|---|
 | `render_page()` | ページ全体を組み立てる |
 | `build_seo_context()` / `render_sitemap_xml()` | 検索エンジン向けの情報と sitemap |
 | `render_update_log()` / `change_log_text()` | 更新履歴。日ごとにまとめ、同じ日の同じ文言は1つにする |

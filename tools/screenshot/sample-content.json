@@ -1,0 +1,167 @@
+{
+  "meta": { "generated_at": "2026-11-01T00:00:00+09:00" },
+  "recruit_calendar": {
+    "label": "2026年度 新歓イベントカレンダー",
+    "year": "2026",
+    "images": [
+      "assets/recruit/01-calendar-1600x900.png",
+      "assets/recruit/02-square-1080x1080.png",
+      "assets/recruit/03-portrait-1080x1350.png"
+    ]
+  },
+  "activities": [
+    {
+      "id": "a1",
+      "title": "秋の合同スケッチ会を開催しました",
+      "body": "10月の週末に、キャンパス内でスケッチ会を行いました。\n新入部員も含めて20名が参加し、[作品の一部](https://example.com)を部室に展示しています。",
+      "category": "record",
+      "created_at": "2026-10-20T03:00:00.000Z",
+      "images": [
+        "assets/activities/a1/01-photo-1600x1200.png",
+        "assets/activities/a1/02-photo-1200x1600.png",
+        "assets/activities/a1/03-photo-1600x900.png",
+        "assets/activities/a1/04-photo-1000x1000.png",
+        "assets/activities/a1/05-photo-1600x1200.png",
+        "assets/activities/a1/06-photo-1600x1200.png",
+        "assets/activities/a1/07-photo-1600x1200.png"
+      ]
+    },
+    {
+      "id": "a2",
+      "title": "第48回学園祭 美術部企画「みんなで描く巨大壁画プロジェクト」の制作過程と完成報告、ならびにご協力いただいた皆さまへのお礼",
+      "body": "学園祭の3日間で、来場者の方と一緒に縦2m・横6mの壁画を描きました。",
+      "category": "event",
+      "created_at": "2026-10-05T03:00:00.000Z",
+      "images": ["assets/activities/a2/01-wide-2400x900.png"]
+    },
+    {
+      "id": "a3",
+      "title": "部室の画材を入れ替えました",
+      "body": "古くなったイーゼルを入れ替えました。",
+      "category": "other",
+      "created_at": "2026-09-01T03:00:00.000Z",
+      "images": ["assets/activities/a3/01-photo-1200x900.png"]
+    },
+    {
+      "id": "a4",
+      "title": "写真のない記事",
+      "body": "写真のない記事は、文章だけを1列で表示します。",
+      "category": "record",
+      "created_at": "2026-08-01T03:00:00.000Z",
+      "images": []
+    }
+  ],
+  "requests": [
+    {
+      "id": "r1",
+      "title": "神戸まつり おまつりパレードの美術協力",
+      "body": "パレードの山車の装飾を担当しました。",
+      "images": ["assets/requests/r1/01-photo-1600x1200.png", "assets/requests/r1/02-photo-1200x1600.png"]
+    },
+    { "id": "r2", "title": "画像のない取り組み事例", "body": "画像がない事例です。", "images": [] }
+  ],
+  "exhibitions": {
+    "upcoming": [
+      {
+        "id": "e1",
+        "title": "凌美会 秋季展覧会 ―境界のむこう側：油彩・水彩・版画・立体による48人の試み―",
+        "subtitle": "第48回 凌美会展 / 学外ギャラリー特別展示",
+        "theme": "「境界」をテーマに、油彩・水彩・版画など約40点を展示します。\n今年は初めて立体作品のコーナーを設けます。",
+        "venue_name": "市民ギャラリー 第2展示室（3階・エレベーター降りて右手）",
+        "venue_address": "兵庫県神戸市中央区○○町1-2-3",
+        "date_line": "2026年11月14日(土)〜18日(水)",
+        "time_line": "10:00〜18:00（最終日は16:00まで）",
+        "folder_id": "f-e1",
+        "folder_url": "https://drive.google.com/drive/folders/f-e1",
+        "dm_image": "assets/exhibitions/e1/DM1-1000x1414.png",
+        "dm_images": ["assets/exhibitions/e1/DM1-1000x1414.png", "assets/exhibitions/e1/DM2-1000x1414.png"],
+        "works": [],
+        "start_date": "2026-11-14"
+      },
+      {
+        "id": "e2",
+        "title": "冬の小品展",
+        "subtitle": "",
+        "theme": "",
+        "venue_name": "部室",
+        "venue_address": "",
+        "date_line": "2026年12月20日(日)",
+        "time_line": "",
+        "folder_id": "",
+        "folder_url": "",
+        "dm_image": "",
+        "dm_images": [],
+        "works": [],
+        "start_date": "2026-12-20"
+      }
+    ],
+    "archive": [
+      {
+        "id": "e3",
+        "title": "春季展 ぼろぼろ",
+        "subtitle": "",
+        "theme": "新入部員の作品を含む展示でした。",
+        "venue_name": "学内ギャラリー",
+        "venue_address": "兵庫県神戸市灘区○○",
+        "date_line": "2026年5月1日(金)〜5日(火)",
+        "time_line": "11:00〜19:00",
+        "folder_id": "f-e3",
+        "folder_url": "https://drive.google.com/drive/folders/f-e3",
+        "dm_image": "assets/exhibitions/e3/DM1-1000x1414.png",
+        "dm_images": ["assets/exhibitions/e3/DM1-1000x1414.png"],
+        "works": [
+          { "image": "assets/exhibitions/e3/001-work-1200x1600.png", "title": "夕暮れ", "artist": "山田 花子" },
+          { "image": "assets/exhibitions/e3/002-work-1600x1200.png", "title": "港", "artist": "佐藤 太郎" },
+          { "image": "assets/exhibitions/e3/003-work-3000x900.png", "title": "パノラマ", "artist": "" },
+          { "image": "assets/exhibitions/e3/004-work-900x2200.png", "title": "", "artist": "鈴木" },
+          { "image": "assets/exhibitions/e3/005-work-1000x1000.png", "title": "静物", "artist": "田中 一郎" },
+          { "image": "assets/exhibitions/e3/006-work-1200x1600.png", "title": "とても長い作品名が入ったときの表示を確かめるための作品", "artist": "とても長い名前の作者" },
+          { "image": "assets/exhibitions/e3/007-work-1600x1200.png", "title": "朝", "artist": "伊藤" },
+          { "image": "assets/exhibitions/e3/008-work-1200x1500.png", "title": "猫", "artist": "渡辺" }
+        ],
+        "start_date": "2026-05-01"
+      },
+      {
+        "id": "e4",
+        "title": "六甲祭",
+        "subtitle": "",
+        "theme": "学園祭での展示です。",
+        "venue_name": "",
+        "venue_address": "",
+        "date_line": "2025年11月8日(土)",
+        "time_line": "",
+        "folder_id": "f-e4",
+        "folder_url": "https://drive.google.com/drive/folders/f-e4",
+        "dm_image": "assets/exhibitions/e4/DM1-1414x1000.png",
+        "dm_images": ["assets/exhibitions/e4/DM1-1414x1000.png"],
+        "works": [],
+        "start_date": "2025-11-08"
+      },
+      {
+        "id": "e5",
+        "title": "DM のないアーカイブ",
+        "subtitle": "",
+        "theme": "",
+        "venue_name": "",
+        "venue_address": "",
+        "date_line": "",
+        "time_line": "",
+        "folder_id": "",
+        "folder_url": "",
+        "dm_image": "",
+        "dm_images": [],
+        "works": [],
+        "start_date": "2025-05-01"
+      }
+    ]
+  },
+  "change_log": [
+    { "timestamp": "2026-10-20T03:00:00.000Z", "kind": "activity", "item_id": "a1", "note": "" },
+    { "timestamp": "2026-10-20T03:00:00.000Z", "kind": "note", "item_id": "", "note": "部室の場所が変わりました" },
+    { "timestamp": "2026-10-05T03:00:00.000Z", "kind": "activity", "item_id": "a2", "note": "" },
+    { "timestamp": "2026-10-01T03:00:00.000Z", "kind": "exhibition", "item_id": "e1", "note": "" },
+    { "timestamp": "2026-10-01T03:00:00.000Z", "kind": "recruit", "item_id": "", "note": "" },
+    { "timestamp": "2026-09-01T03:00:00.000Z", "kind": "request", "item_id": "r1", "note": "" },
+    { "timestamp": "2026-08-01T03:00:00.000Z", "kind": "activity", "item_id": "deleted", "note": "" }
+  ]
+}
