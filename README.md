@@ -130,7 +130,15 @@ python -m http.server 8000
 
 `build/` と `dist/` は Git に入りません。
 
-**テスト**：鍵がなくても動きます（Google には接続せず、偽の Sheets と Drive を使う）。GitHub Actions でも、ビルドの前に必ず動かします。テストが通らなければビルドは止まり、サイトは前の状態のまま残ります。
+**テスト**：鍵がなくても動きます（Google には接続せず、偽の Sheets と Drive を使う）。GitHub Actions では、プッシュのたび（`check.yml`）と、ビルドの前（`deploy.yml`）に動かします。ビルドの前のテストが通らなければビルドは止まり、サイトは前の状態のまま残ります。
+
+**公開してはいけないものを入れない**：このリポジトリは公開しています。`tests/test_repository_contents.py` は、メールアドレス（見本用のドメインと、サイトに載せている部の連絡先を除く）・管理画面の URL・鍵・Excel のファイルなどが入っていたら失敗します。プッシュしたあとでは遅いので、**クローンしたら1回だけ**次を実行し、コミットの前にも確かめるようにしてください（`.githooks/pre-commit` が動きます）。
+
+```bash
+git config core.hooksPath .githooks
+```
+
+あわせて、GitHub の「Settings」→「Advanced Security」→「Secret Protection」の「Push protection」を有効にしておくと、鍵などの形をしたものはプッシュの時点で GitHub が止めます。
 
 ```bash
 python -m unittest discover tests

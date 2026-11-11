@@ -6,3 +6,9 @@ dist/
 *-key.json
 tools/screenshot/out/
 tools/screenshot/node_modules/
+# 部員の情報が入りやすいファイル（tests/test_repository_contents.py でも止める）
+*.xlsx
+*.xls
+.clasprc.json
+# 作業用のメモや書き出したデータを置く場所
+tmp/

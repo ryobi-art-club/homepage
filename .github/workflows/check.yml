@@ -1,0 +1,29 @@
+name: Check
+
+# プッシュのたびにテストを動かす（サイトのビルドは公開のときだけ動くので、その前に気づけるように）。
+# 公開してはいけないものを入れてしまったときも、ここで失敗のメールが届く
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m unittest discover tests

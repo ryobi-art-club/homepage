@@ -26,6 +26,7 @@ A full local build needs the service-account key and the spreadsheet ID (README 
 
 - **Never** commit, push, run the workflow, or send anything to an external service unless the maintainer explicitly asks in this conversation.
 - **Never** read or print credentials (service-account JSON, keys). They must never be committed (`.gitignore` covers common names).
+- This repository is public. Never commit e-mail addresses (other than reserved example domains and the club's public contact address), the CMS web-app URL, keys, or spreadsheet exports. `tests/test_repository_contents.py` enforces this; it runs in `.githooks/pre-commit` (enable once per clone with `git config core.hooksPath .githooks`) and on every push (`.github/workflows/check.yml`).
 - Read sheet columns by header name and tolerate missing columns: the CMS and this site may be deployed in either order.
 - Some class names are assembled in code (e.g. `exhibition-{placement}-heading` and `image-count-{n}` in `sitebuild/sections.py`). Before removing CSS as unused, search for the parts of the name too, and check the page at desktop and phone widths.
 - Images in `src/` are copied to `dist/` by name (`STATIC_FILES` in `build_site.py`); a new image needs its name added there.
