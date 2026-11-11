@@ -1,6 +1,6 @@
 # AGENTS.md — homepage
 
-Instructions for AI coding agents working in this repository. Human-oriented documentation is in [README.md](README.md) (Japanese). The system overview, accounts and operations are documented in the sibling repository `homepage-cms` (its README.md and AGENTS.md); read those first.
+Instructions for AI coding agents working in this repository. Human-oriented documentation is in [README.md](README.md) (Japanese). The system overview, accounts and operations are documented in the sibling repository `homepage-cms` (its README.md and AGENTS.md); read those first. The coding rules shared by both repositories (consistency, no double management, naming, wording, HTML, CSS, verification, working with the maintainer) are in homepage-cms README section 11 and apply here too.
 
 ## What this is
 
@@ -36,11 +36,12 @@ A full local build needs the service-account key and the spreadsheet ID (README 
 
 - HTML is built with `html(template, **values)` from `sitebuild/html.py`: values are escaped, `Markup` results and lists of them are inserted as is, `None`/`False` insert nothing, newlines plus indentation in the template are removed. Wrap only fixed markup from the code in `Markup(…)`. Do not build HTML with f-strings and `escape()`. The package is `sitebuild`, not `site` (that name is a Python standard module).
 - The CMS has a preview pane that imitates this site (`homepage-cms/UiStyles.html`, "サイトプレビュー" section, and the preview renderers in `UiPreview.html`). When you change how content looks here, mention that the CMS preview should be updated to match.
+- **Styles**: pick colours and sizes from the tokens at the top of `src/stylesheet.css` by role (text: `--text-body` / `--text-soft` / `--text-muted`; lines: `--divider` / `--line-strong` / `--underline`; surfaces: `--glass` / `--glass-strong`). Write a raw value only for a one-off effect (hero shade, grid overlay, logo glow). No inline `style=` for looks in the generated HTML, except values computed per item (`--ratio`, `--rows`, carousel ratios).
 - Keep pages light: no embedded third-party widgets (maps are plain links to Google Maps search URLs).
 - Comments are in Japanese, and only for what the code cannot say (a reason, an agreement with the CMS, a past incident). Prefer clearer names and structure over a comment, and keep consistent with how the rest of the code does the same thing.
 
 ## Working with the maintainer
 
 - Report in Japanese, in plain words; say what you verified and what you could not.
-- Show before/after for visible changes and get agreement before finalizing.
+- Show before/after for visible changes and get agreement before finalizing. For changes that should not alter the page, compare the sample-content screenshots before and after (`tools/screenshot/compare.cjs`); for changes to the data read from the sheets, also compare the page built from real data (ask the maintainer for an Excel export).
 - Update `README.md` when setup, the static content fields or the page structure change.
