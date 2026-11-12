@@ -7,7 +7,7 @@ Instructions for AI coding agents working in this repository. This file is in En
 The website of the 凌美会 art club, in two parts that are deployed separately:
 
 - **Public site** (repository root): a static page built by `scripts/` from Google Sheets and Drive and published on GitHub Pages by `.github/workflows/deploy.yml`, which runs only on `workflow_dispatch` (the CMS "公開する" button or a manual run); pushing does not rebuild the site.
-- **CMS** (`cms/`): a Google Apps Script web app that members use to edit and publish content; deployed with clasp from `cms/`.
+- **CMS** (`cms/`): a Google Apps Script web app that members use to edit and publish content; deployed with `clasp -P cms push` from the repository root.
 
 ## Read before you work
 

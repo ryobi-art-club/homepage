@@ -3,7 +3,7 @@
 管理画面（`cms/`）や公開サイトのコードを直し、確かめて、反映するときに読みます。流れは次のとおりです。
 
 1. [開発の環境を整える](#開発の環境を整える最初に1回)（最初の1回だけ）
-2. 直す：[公開サイトの見た目や動きを変えるとき](#公開サイトの見た目や動きを変えるとき)、[ハマりどころ](#ハマりどころ)、[コードを書くときの決まり](coding-rules.md)
+2. 直す：[コードを読み始めるとき](#コードを読み始めるとき)、[公開サイトの見た目や動きを変えるとき](#公開サイトの見た目や動きを変えるとき)、[ハマりどころ](#ハマりどころ)、[コードを書くときの決まり](coding-rules.md)
 3. [確かめる](#確かめる)：テストと、画面の撮影
 4. [反映する](#反映する)：管理画面と公開サイトは、反映の方法が別々
 
@@ -15,7 +15,7 @@
 
 | 道具 | 手元で確かめた版 | GitHub Actions | 使うところ |
 |---|---|---|---|
-| Git | 2.53（Windows） | — | リポジトリの取得・コミット |
+| Git | — | — | リポジトリの取得・コミット |
 | Node.js | 24 | 24 | 管理画面のテスト・プレビュー・撮影、clasp（clasp は 22 以上が必要） |
 | Python | 3.14 | 3.12 | 公開サイトのビルドとテスト（3.12 以上ならどれでもよい） |
 | clasp | 3.3 | — | 管理画面を GAS に送る |
@@ -81,6 +81,17 @@ Chrome が標準の場所（Windows の `C:/Program Files/Google/Chrome/Applicat
 
 **ブランチ**：ふつうは `main` に直接コミットして push して構いません（[設計の判断](decisions.md)）。
 
+## コードを読み始めるとき
+
+初めてコードを読むときは、部員が「公開する」を押してからサイトに出るまでを、1本の線でたどるのがおすすめです。この流れに、管理画面とサイトのほとんどの部分が出てきます。各段階の関数の役割は、括弧の中の資料の表で調べます。
+
+1. **画面を触る**：手元のプレビュー（[管理画面を手元で確かめる（プレビューと撮影）](#管理画面を手元で確かめるプレビューと撮影)）を開き、項目を編集して「公開する」まで押してみる。何ができるシステムかを、先に手でつかみます。
+2. **ボタンからサーバーへ**：`cms/UiPublish.html` の `startPublish` → `publishContent`（誤字チェックのあと、`buildPayload()` で作った内容を `serverCall('publishState', …)` で送る）。`serverCall` は `cms/UiCore.html` にあります（[管理画面の仕組み](reference/cms.md) の「`Ui.html` / 画面のスクリプト」）。
+3. **公開の処理**：`cms/ContentApi.js` の `publishState` を上から読む。`normalizePayload_`（内容を整える）→ `finalizeManagedFolders_`（Drive）→ `writePublishedState_`・`appendChangeLog_`（シートに保存）→ `appendAdminLog_` → `clearDrafts_` → `dispatchGithubWorkflow_`（サイトのビルドを起動）→ `collectGarbage_`（片付け）（[管理画面の仕組み](reference/cms.md) の「`ContentApi.js`」、保存する形は [データの約束](reference/data.md)）。
+4. **サイトのビルド**：`.github/workflows/deploy.yml` の手順を上から読む。`scripts/fetch_google_content.py` の `main`（`read_published_content` で内容を読み、`normalize_…` で画像を取る）→ `scripts/build_site.py` の `main` → `scripts/sitebuild/page.py` の `render_page` → `sections.py` の各 `render_…`（[公開サイトの仕組み](reference/site.md) の「ファイルごとの詳細」）。
+
+ログイン（`cms/AppAuth.js`）と画像のアップロード（`cms/MediaApi.js`）は、この流れの外にあります。必要になったときに読めば足ります。
+
 ## 公開サイトの見た目や動きを変えるとき
 
 - HTML は `scripts/sitebuild/` が Python で組み立てています（外部のテンプレートの仕組みは使っていません）。HTML は `html()`（`sitebuild/html.py`）で作ります。`{名前}` に入れた値は文字として表示されるように書き換わるので、内容に `<` や `"` があってもページは崩れません。管理画面の画面の作り方（`html`…`` ）と同じ考え方です。
@@ -89,6 +100,18 @@ Chrome が標準の場所（Windows の `C:/Program Files/Google/Chrome/Applicat
 - 管理画面の右側の「プレビュー」は、このサイトの見た目をまねて作っています（`cms/UiStyles.html` の「サイトプレビュー」の部分と、`cms/UiPreview.html`）。サイトの見た目を変えたら、管理画面のプレビューも合わせて直すと、部員が公開前に確認しやすくなります。
 - 変えたら、手元でビルドして確認します（[公開サイトを手元で作って確かめる（撮影）](#公開サイトを手元で作って確かめる撮影)）。
 - 名前の付け方・二重管理をしない・言葉・HTML・CSS の決まりは、管理画面と共通です（[コードを書くときの決まり](coding-rules.md)）。CSS の色や大きさは、`src/stylesheet.css` の先頭の決まった値から役割で選びます。
+
+## 外部のライブラリや道具の版を上げるとき
+
+上げるかどうかの判断は [管理者の手順](operations.md) の「更新を入れるかの判断」。上げたら、[テスト](#テスト) と撮影（`cms/tools/preview/shoot.cjs`・`tools/screenshot/shoot.cjs`）で確かめます。
+
+| もの | 直す場所 | 注意 |
+|---|---|---|
+| SheetJS（Excel の目録の読み込み） | `cms/UiMedia.html` の `SHEETJS_URL` と `SHEETJS_INTEGRITY` | 2つを一緒に変える。整合性チェックの値は `curl -s <URL> \| openssl dgst -sha384 -binary \| openssl base64 -A` の結果の頭に `sha384-` を付けたもの。`cms/tools/preview/shoot.cjs` が「SheetJS を整合性チェック付きで読み込めた」と出すか確かめる |
+| Font Awesome（アイコン） | 管理画面の `cms/Ui.html` と、サイトの `scripts/sitebuild/page.py` | 両方の URL と `integrity` を一緒に変える。値は `curl -s <URL> \| openssl dgst -sha512 -binary \| openssl base64 -A` の結果の頭に `sha512-` を付けたもの（[cdnjs](https://cdnjs.com/libraries/font-awesome) のページにも載っている）。撮影でアイコンが出るか確かめる |
+| Python のライブラリ | `requirements.txt` | 大きな版上げで壊れないよう上限（`<3` など）を付けている。上限を上げるときは、手元でビルドして確かめる（鍵が要るので、管理者が行う） |
+| GitHub Actions の部品 | `.github/workflows/deploy.yml`・`check.yml` の `actions/checkout@v5` など | 上げたら、手動実行（Run workflow）でビルドが通るか確かめる |
+| Node.js・Python の版 | `.github/workflows/` の `node-version`・`python-version` と、このページの「動作を確かめた版」の表 | 手元とワークフローの両方で、テストが通るか確かめる |
 
 ## ハマりどころ
 
@@ -125,15 +148,11 @@ GAS に送らないファイルは `.claspignore` に書きます。手元専用
 
 ### ログインの有効期限は、操作しても延びない
 
-ログインの有効期限（`SESSION_TTL_MINUTES`、180分）は、**ログインした時点から**数えます。操作していても延長されません。再読み込みしても有効期限の間はログインしたままですが、延長はされません。切れると「セッションが切れています」と出るので、こまめな下書き保存を部員に勧めています。
+ログインの有効期限（`SESSION_TTL_MINUTES`。[Script Properties（設定値）](reference/cms.md#script-properties設定値)）は、**ログインした時点から**数えます。操作していても延長されません。再読み込みしても有効期限の間はログインしたままですが、延長はされません。切れると「セッションが切れています」と出るので、こまめな下書き保存を部員に勧めています。
 
 ### Drive を手で直接いじると、次に変更するまで合わせ直されない
 
 公開処理は、前回の公開から変わっていない項目の Drive のフォルダを確認しません（[管理画面の仕組み](reference/cms.md#contentapijs--画面から呼ばれる入口内容と公開)の「変わった分だけ処理する」）。Drive でフォルダ名や共有設定を手で変えても、その項目を管理画面で変更して公開するまでは、そのままになります。ファイルの管理は管理画面の中で行ってください。
-
-### 「公開する」で全員の下書きが消える
-
-公開すると、その時点の内容がサイトに出るのと同時に、保存されていた下書きがすべて消えます（`clearDrafts_`）。複数人で作業するときは、公開の前に声をかけ合う運用にしています。
 
 ### 複数の Google アカウントでログインしていると開けない
 
@@ -231,7 +250,7 @@ node tools/screenshot/compare.cjs <控えのフォルダ>          # 作業の�
 
 ### 管理画面を反映する
 
-`clasp push` で送るのはテスト用の版だけです。部員が使っている本番の管理画面は、手順4のデプロイまで変わりません。
+`clasp -P cms push` で送るのはテスト用の版だけです。部員が使っている本番の管理画面は、手順4のデプロイまで変わりません。
 
 1. リポジトリの直下で `clasp -P cms push` を実行する（`-P cms` で `cms/.clasp.json` を使う。`cms/` に移らなくてよい）。`cms/.claspignore` に書いたもの（`tests/`・`tools/` など）は送られない。
    ```bash
