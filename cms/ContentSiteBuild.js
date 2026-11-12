@@ -26,10 +26,6 @@ function dispatchGithubWorkflow_() {
 
 function getGithubToken_() {
   const config = getConfig_();
-  if (String(config.GH_AUTH_MODE).toUpperCase() === 'PAT') {
-    if (!config.GH_FINE_GRAINED_PAT) throw new Error('GH_FINE_GRAINED_PAT が設定されていません。');
-    return config.GH_FINE_GRAINED_PAT;
-  }
   if (!config.GH_APP_ID || !config.GH_INSTALLATION_ID || !config.GH_PRIVATE_KEY) {
     throw new Error('GitHub App 用の Script Properties が不足しています。');
   }

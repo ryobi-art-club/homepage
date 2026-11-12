@@ -118,7 +118,7 @@ cms/
 
 | 関数（画面から呼ばれるもの） | 役割 |
 |---|---|
-| `getBootstrapData` | 画面を開いたときに必要なものをまとめて返す（内容、下書き、公開履歴、Drive の容量）。シートは `prefetchSheets_`（ContentStore.js）で、Sheets API の1回の問い合わせでまとめて読む（GAS の「サービス」の Sheets を使う。`appsscript.json` の `enabledAdvancedServices` に書いてある。UrlFetchApp で直接 API を呼ぶ方法は、API が有効になっておらず失敗した）。SpreadsheetApp は1枚につき4回ほど問い合わせるため、1枚ずつ読むと8秒のうち7秒がシートの読み込みだった（2026年10月に計測）。まとめて読めないとき（シートがない、など）は1枚ずつ読む |
+| `getBootstrapData` | 画面を開いたときに必要なものをまとめて返す（内容、下書き、公開履歴、Drive の容量）。シートは `prefetchSheets_`（ContentStore.js）で、Sheets API の1回の問い合わせでまとめて読む（GAS の「サービス」の Sheets。理由は [設計の判断](../decisions.md)）。まとめて読めないとき（シートがない、など）は1枚ずつ読む |
 | `saveDraft` / `loadDraft` | 下書きの保存・読み込み（`_Drafts` シート） |
 | `previewSiteHistory` | 公開したらサイトの更新履歴がどうなるかの予測 |
 | `publishState` | 公開処理（下の流れ） |
@@ -136,7 +136,7 @@ cms/
 
 Drive とスプレッドシートの更新全体は、途中で失敗してもまとめて元に戻る仕組みにはなっていません。ただし、もう一度「公開する」を押せば続きから正しい状態になるように作っています。
 
-**変わった分だけ処理する**：公開のたびに全部の項目のフォルダや画像を確認すると、コンテンツが増えるほど公開が遅くなります（2026年10月の時点で、変更なしの公開に約2分かかっていた）。そこで、前回公開した内容（`_PublishedState`）と比べ、Drive に関わる部分（タイトル・公開／非公開・フォルダ・展示会の DM と作品）が変わった項目だけを処理します（`buildDriveChangeFilter_`）。前回の公開が途中で失敗した場合は控えが更新されないので、次の公開で改めて処理されます。
+**変わった分だけ処理する**：公開のたびに全部の項目のフォルダや画像を確認すると、内容が増えるほど公開が遅くなります（[設計の判断](../decisions.md)）。そこで、前回公開した内容（`_PublishedState`）と比べ、Drive に関わる部分（タイトル・公開／非公開・フォルダ・展示会の DM と作品）が変わった項目だけを処理します（`buildDriveChangeFilter_`）。前回の公開が途中で失敗した場合は控えが更新されないので、次の公開で改めて処理されます。
 
 **公開のあとの片付け**：サイトの更新を始めたあと（公開が成功したあと）に、`collectGarbage_` が片付けをします。対象と決まりは [Google Drive のフォルダ構成](#google-drive-のフォルダ構成) を見てください。20秒で打ち切り、残りは次の公開で続けます。片付けで失敗しても、公開はエラーにしません。何を片付けたかは、`_AdminLog` のその公開の行の `cleanup` の列に書きます。
 
@@ -187,10 +187,7 @@ Drive とスプレッドシートの更新全体は、途中で失敗しても�
 
 ### `ContentSiteBuild.js` — サイトのビルド（GitHub Actions）の起動
 
-`dispatchGithubWorkflow_()` が、このリポジトリのサイトのビルドのワークフロー（`.github/workflows/deploy.yml`）を起動します（`workflow_dispatch`）。認証は `GH_AUTH_MODE` で選びます。
-
-- `APP`（**現在使っている方式**）：GitHub App の秘密鍵から署名付きのトークン（JWT）を作り、それと引き換えに、短時間だけ使えるトークンを毎回受け取って使う
-- `PAT`：Fine-grained Personal Access Token をそのまま使う。作った人の個人のトークンで有効期限もあるため、今は使っていない
+`dispatchGithubWorkflow_()` が、このリポジトリのサイトのビルドのワークフロー（`.github/workflows/deploy.yml`）を起動します（`workflow_dispatch`）。認証には GitHub App を使います。App の秘密鍵から署名付きのトークン（JWT）を作り、それと引き換えに、短時間だけ使えるトークンを毎回受け取って使います（理由は [設計の判断](../decisions.md)）。
 
 ### `AppErrorReport.js` — エラーの通知
 
@@ -233,14 +230,7 @@ GAS エディタの「プロジェクトの設定」→「スクリプト プロ
 | `GH_REPO` | 公開サイトのリポジトリ名（`homepage`） |
 | `GH_WORKFLOW_FILE` | ワークフローのファイル名（`deploy.yml`） |
 | `GH_BRANCH` | ワークフローを動かすブランチ（`main`） |
-| `GH_AUTH_MODE` | `APP`（現在）または `PAT` |
-
-**GitHub の認証（`GH_AUTH_MODE` に応じて）**
-
-| 名前 | 内容 |
-|---|---|
-| `GH_APP_ID` / `GH_INSTALLATION_ID` / `GH_PRIVATE_KEY` | `APP` のとき（現在）。秘密鍵は PEM 形式で、改行は `\n` と書く。App にはこのリポジトリの `Actions: Read and write` 権限が必要 |
-| `GH_FINE_GRAINED_PAT` | `PAT` のとき。このリポジトリの `Actions: Read and write` 権限が必要 |
+| `GH_APP_ID` / `GH_INSTALLATION_ID` / `GH_PRIVATE_KEY` | GitHub App の ID・インストール ID・秘密鍵。秘密鍵は PEM 形式で、改行は `\n` と書く。App にはこのリポジトリの `Actions: Read and write` 権限が必要。欠けていると、「公開する」のサイトのビルドの起動だけが失敗する |
 
 **任意**
 

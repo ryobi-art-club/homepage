@@ -329,17 +329,17 @@ test('grid cleanup preserves active split drafts, frozen regions and empty sheet
   const before = ctx.stableStringify_(ctx.readDrafts_());
   sheets._Drafts.maxRows = 1000;
   sheets._Drafts.maxColumns = 100;
-  sheets.Recruit = new Sheet();
-  sheets.Recruit.frozenRows = 3;
-  sheets.Recruit.frozenColumns = 2;
-  sheets.Recruit.maxRows = 1000;
-  sheets.Recruit.maxColumns = 26;
+  sheets._AdminLog = new Sheet();
+  sheets._AdminLog.frozenRows = 3;
+  sheets._AdminLog.frozenColumns = 2;
+  sheets._AdminLog.maxRows = 1000;
+  sheets._AdminLog.maxColumns = 26;
   ctx.compactContentSheetGrids_();
   assert.equal(ctx.stableStringify_(ctx.readDrafts_()), before);
   assert.equal(sheets._Drafts.maxRows, 2);
   assert.equal(sheets._Drafts.maxColumns, sheets._Drafts.getLastColumn());
-  assert.equal(sheets.Recruit.maxRows, 4);
-  assert.equal(sheets.Recruit.maxColumns, 3);
+  assert.equal(sheets._AdminLog.maxRows, 4);
+  assert.equal(sheets._AdminLog.maxColumns, 3);
 });
 
 test('publish timings are written next to the admin log row, adding the column once', () => {

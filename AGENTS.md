@@ -80,5 +80,6 @@ node tools/preview/compare.cjs <dir>                           # after it: scree
 ## Working with the maintainer
 
 - Report in Japanese, in plain words; spell out abbreviations. Say what you verified and what you could not verify.
-- The maintainer's checks are expensive (deploy + reload + one-time-code login, and publish/build waits): batch changes, ask only for checks whose result changes your next step, and check the real trigger and configuration before writing deploy steps (`docs/coding-rules.md`, 「管理者に確認をお願いするとき」).
+- The maintainer's checks are expensive (deploy + reload + one-time-code login, and publish/build waits): batch deploys, ask only for checks whose result changes your next step, and check the real trigger and configuration (workflow files etc.) before writing deploy steps.
+- There is no staging environment: the `/dev` test deployment of the CMS uses the real spreadsheet, Drive and workflow. Verify with the local preview and mocks first.
 - Show before/after screenshots for visible changes, and ask before decisions that are the maintainer's to make (wording members see, removing features, anything irreversible).

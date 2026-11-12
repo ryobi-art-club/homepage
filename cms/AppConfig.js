@@ -1,10 +1,6 @@
 // 設定：スクリプト プロパティとシートの名前
 
 const CONTENT_SHEETS = {
-  recruit: 'Recruit',
-  activityArticles: 'ActivityArticles',
-  exhibitions: 'Exhibitions',
-  requestCases: 'RequestCases',
   changeLog: 'ChangeLog',
   publishedState: '_PublishedState',
   drafts: '_Drafts',
@@ -26,8 +22,7 @@ function getConfig_() {
     'GH_OWNER',
     'GH_REPO',
     'GH_WORKFLOW_FILE',
-    'GH_BRANCH',
-    'GH_AUTH_MODE'
+    'GH_BRANCH'
   ];
   const config = {};
   required.forEach((key) => {
@@ -45,7 +40,6 @@ function getConfig_() {
   config.GH_APP_ID = String(props.getProperty('GH_APP_ID') || '').trim();
   config.GH_INSTALLATION_ID = String(props.getProperty('GH_INSTALLATION_ID') || '').trim();
   config.GH_PRIVATE_KEY = String(props.getProperty('GH_PRIVATE_KEY') || '').replace(/\\n/g, '\n');
-  config.GH_FINE_GRAINED_PAT = String(props.getProperty('GH_FINE_GRAINED_PAT') || '').trim();
   config.GEMINI_API_KEY = String(props.getProperty('GEMINI_API_KEY') || '').trim();
   config.GEMINI_MODEL = String(props.getProperty('GEMINI_MODEL') || 'gemini-3.1-flash-lite').trim();
   // 'trash' なら片付けの対象を Drive のゴミ箱に入れる。それ以外は _AdminLog に一覧を書くだけ
