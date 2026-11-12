@@ -1,6 +1,6 @@
 // スプレッドシートの読み書き：公開した内容・下書き・更新履歴・操作ログ
 
-// 内容は _PublishedState の1か所にある（README「8-4」）。読めないときは parsePayloadCells_ がエラーで止め、
+// 内容は _PublishedState の1か所にある（docs/reference/data.md）。読めないときは parsePayloadCells_ がエラーで止め、
 // 空の内容を出さない（そのまま公開してサイトを空にしないため）
 // spreadsheet は省略できる。prefetchSheets_ の結果も渡せる
 function readContentState_(spreadsheet) {
@@ -32,7 +32,7 @@ function writePublishedState_(payloadJson, sha256) {
   ]);
 }
 
-// サイトの更新履歴（版2）の列。サイトのビルドも読む（README「8-4」）
+// サイトの更新履歴（版2）の列。サイトのビルドも読む（docs/reference/data.md）
 const CHANGE_LOG_HEADER = ['timestamp', 'kind', 'item_id', 'note', 'actor_name'];
 
 // 新しい順

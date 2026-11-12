@@ -1,7 +1,7 @@
 // 保存する内容の形（版2）：整える・確かめる・保存する形にする
 
 // 保存する内容の形（版2）。管理画面とサイトのビルドの約束なので、項目を変えるときは
-// サイトの scripts/fetch_google_content.py と README「8-4」も直す
+// サイトの scripts/fetch_google_content.py と docs/reference/data.md も直す
 const CONTENT_FORMAT_VERSION = 2;
 
 const ACTIVITY_CATEGORIES = ['record', 'event', 'other'];

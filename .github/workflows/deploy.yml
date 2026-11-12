@@ -41,7 +41,7 @@ jobs:
           printf '%s' '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > /tmp/service-account.json
 
       # 前回のビルドで取得した画像。公開リポジトリのキャッシュは、プルリクエストを作れる人なら誰でも
-      # 読めるので、今のサイトに載っている画像だけを入れる（README の「画像のキャッシュ」）
+      # 読めるので、今のサイトに載っている画像だけを入れる（docs/reference/site.md の「画像のキャッシュ」）
       - name: Restore image cache
         uses: actions/cache/restore@v4
         with:

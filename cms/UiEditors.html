@@ -341,7 +341,7 @@ function addActivityArticle() {
     mediaFolderId: '',
     mediaFileIds: [],
     published: true,
-    createdAt: new Date(Date.now() + 3600 * 1000).toISOString()
+    createdAt: new Date().toISOString()
   });
   commitEditorChange('activity');
 }
@@ -450,7 +450,7 @@ function addExhibition() {
     dmFileIds: [],
     works: [],
     published: true,
-    draftCreatedAt: new Date(Date.now() + 3600 * 1000).toISOString()
+    draftCreatedAt: new Date().toISOString()
   });
   commitEditorChange('exhibition');
 }

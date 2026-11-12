@@ -2,7 +2,7 @@
 
 // サイトの更新履歴（ChangeLog、版2）は1行に1つの変更を持つ：kind（種類）・itemId（項目の ID）・note（メモの文）。
 // サイトに出す文言は、表示するときに今の内容から作る（タイトルは保存しない。名前を変えても過去の行がそのまま新しい名前になる）。
-// 文言の作り方は、サイトのビルド（scripts/sitebuild/sections.py の CHANGE_LOG_TEXT）と同じにする（README「8-4」）
+// 文言の作り方は、サイトのビルド（scripts/sitebuild/sections.py の CHANGE_LOG_TEXT）と同じにする（docs/reference/data.md）
 const CHANGE_LOG_ITEM_LISTS = {
   activity: { listName: 'activityArticles', idKey: 'articleId', text: (title) => '活動記録・告知「' + title + '」' },
   request: { listName: 'requestCases', idKey: 'caseId', text: (title) => '取り組み「' + title + '」' },

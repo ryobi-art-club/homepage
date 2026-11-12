@@ -21,7 +21,7 @@ SCOPES = [
     'https://www.googleapis.com/auth/drive.readonly',
     'https://www.googleapis.com/auth/spreadsheets.readonly',
 ]
-# 管理画面は、公開した内容全体を _PublishedState に JSON で書く（形は README「8-4」）
+# 管理画面は、公開した内容全体を _PublishedState に JSON で書く（形は docs/reference/data.md）
 PUBLISHED_STATE_RANGE = "'_PublishedState'"
 # 範囲を区切らない（行が増えても、新しい履歴から読まれなくなることがないように）
 CHANGE_LOG_RANGE = "'ChangeLog'"
@@ -212,8 +212,9 @@ def published_items(items: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     return [item for item in items or [] if item.get('published', True) and item.get('title')]
 
 
+# 公開中の年度がなければ、何も載せない（非公開の年度を出さない）
 def published_recruit_calendar(calendars: list[dict[str, Any]]) -> dict[str, Any]:
-    return next((item for item in calendars if item.get('published') is True), calendars[0] if calendars else {})
+    return next((item for item in calendars if item.get('published') is True), {})
 
 
 # サイトに載せる画像のファイル ID。ファイルの情報をまとめて問い合わせるために集める
@@ -286,7 +287,7 @@ def normalize_recruit_calendar(calendars: list[dict[str, Any]], drive, assets_ro
 def normalize_activity_articles(articles: list[dict[str, Any]], drive, assets_root: Path) -> list[dict[str, Any]]:
     items = []
     for article in published_items(articles):
-        article_id = article.get('articleId') or safe_slug(article['title'])
+        article_id = article['articleId']
         items.append({
             'id': article_id,
             'title': article['title'],
@@ -302,7 +303,7 @@ def normalize_activity_articles(articles: list[dict[str, Any]], drive, assets_ro
 def normalize_requests(cases: list[dict[str, Any]], drive, assets_root: Path) -> list[dict[str, Any]]:
     items = []
     for case in published_items(cases):
-        case_id = case.get('caseId') or safe_slug(case['title'])
+        case_id = case['caseId']
         items.append({
             'id': case_id,
             'title': case['title'],
@@ -316,7 +317,7 @@ def normalize_exhibitions(exhibitions: list[dict[str, Any]], drive, assets_root:
     upcoming = []
     archive = []
     for exhibition in published_items(exhibitions):
-        ex_id = exhibition.get('exhibitionId') or safe_slug(exhibition['title'])
+        ex_id = exhibition['exhibitionId']
         folder = assets_root / 'exhibitions' / ex_id
 
         dm_images = []
@@ -349,7 +350,6 @@ def normalize_exhibitions(exhibitions: list[dict[str, Any]], drive, assets_root:
             'time_line': exhibition.get('timeLine', ''),
             'folder_id': folder_id,
             'folder_url': f'https://drive.google.com/drive/folders/{folder_id}' if folder_id else '',
-            'dm_image': dm_images[0] if dm_images else '',
             'dm_images': dm_images,
             'works': works,
             'start_date': exhibition.get('startDate', ''),

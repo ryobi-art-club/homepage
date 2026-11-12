@@ -1,5 +1,5 @@
 """ページの部品ごとの HTML（更新履歴・展示会・活動記録・ご依頼・入部案内・ヒーロー）。
-管理画面のプレビュー（cms/UiPreview.html）が同じ部品をまねているので、見た目を変えたら両方を直す（対応する関数は README「12-6」）。"""
+管理画面のプレビュー（cms/UiPreview.html）が同じ部品をまねているので、見た目を変えたら両方を直す（対応する関数は docs/reference/site.md）。"""
 from __future__ import annotations
 
 import re
@@ -99,7 +99,7 @@ def render_work_gallery(works: list[dict[str, Any]], gallery_id: str) -> Markup 
 
 # ---------- 更新履歴 ----------
 
-# 更新履歴の文言。管理画面（cms/ContentHistory.js の CHANGE_LOG_ITEM_LISTS）と同じにする（README「8-4」）
+# 更新履歴の文言。管理画面（cms/ContentHistory.js の CHANGE_LOG_ITEM_LISTS）と同じにする（docs/reference/data.md）
 CHANGE_LOG_RECRUIT_TEXT = '新歓イベントカレンダーを更新'
 CHANGE_LOG_TEXT = {
     'activity': '活動記録・告知「{}」',
@@ -145,18 +145,8 @@ def render_update_log(change_log: list[dict[str, Any]], data: dict[str, Any]) ->
 
 # ---------- 展示会 ----------
 
-def exhibition_dm_images(item: dict[str, Any]) -> list[str]:
-    images = item.get('dm_images') or []
-    if isinstance(images, str):
-        images = [images]
-    images = [str(image) for image in images if image]
-    if not images and item.get('dm_image'):
-        images = [str(item.get('dm_image'))]
-    return images[:2]
-
-
 def render_dm_carousel(item: dict[str, Any], label: str) -> Markup | str:
-    images = exhibition_dm_images(item)
+    images = item.get('dm_images', [])[:2]
     if not images:
         return ''
     return html('<div class="dm-poster-wrap">{carousel}</div>', carousel=render_carousel(images, label, max_images=2, extra_class='dm-carousel'))

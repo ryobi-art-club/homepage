@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const sources = require('./files.cjs');
 
-// README「HtmlService インライン JS の注意」の確認を自動化する。
+// docs/development.md の「画面のスクリプトに書いてはいけない文字列がある」の確認を自動化する。
 // GAS 配信時に <script> が崩れると、ログイン画面のボタンなども動かなくなる。
 const scripts = sources.uiScriptFiles();
 

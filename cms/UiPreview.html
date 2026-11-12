@@ -187,7 +187,9 @@ async function refreshPreview(kind) {
 }
 
 async function renderRecruitPreview(items) {
-  const recruit = items.find((item) => item.published !== false) || items[0] || {};
+  /* サイトと同じく、公開中の年度だけを出す */
+  const recruit = items.find((item) => item.published === true);
+  if (!recruit) return html`<div class="preview-empty">公開中の年度はありません。</div>`;
   if (!recruit.mediaFolderId) return html`<div class="preview-empty">画像は未設定です。</div>`;
   const files = await getFolderImagesCached(recruit.mediaFolderId);
   const registered = orderedFilesByIds(files, mediaIdsForItem(recruit));

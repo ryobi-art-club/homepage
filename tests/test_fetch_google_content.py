@@ -195,6 +195,16 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(split[1].downloads, whole[1].downloads)
 
 
+class RecruitTest(unittest.TestCase):
+    def test_only_the_published_year_is_shown(self):
+        calendars = [{'year': '2025', 'published': False}, {'year': '2026', 'published': True}]
+        self.assertEqual(fetch.published_recruit_calendar(calendars)['year'], '2026')
+
+    def test_nothing_is_shown_when_no_year_is_published(self):
+        self.assertEqual(fetch.published_recruit_calendar([{'year': '2025', 'published': False}]), {})
+        self.assertEqual(fetch.published_recruit_calendar([]), {})
+
+
 class UpdateLogTest(unittest.TestCase):
     """サイトの更新履歴：ChangeLog の行（1行に1つの変更）から、今の内容のタイトルで文言を作る"""
 
