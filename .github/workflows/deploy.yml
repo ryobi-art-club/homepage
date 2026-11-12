@@ -6,6 +6,11 @@ on:
 permissions:
   contents: read
 
+# 公開を続けて押しても、ビルドは1つずつ順に動かす（古い内容のビルドが後から終わって、新しいサイトを上書きしないように）
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest

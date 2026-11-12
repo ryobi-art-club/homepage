@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import html as _html
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 
@@ -57,8 +57,17 @@ def rich_text(value: Any) -> Markup:
     return Markup('<br>'.join(inline_rich_text(line) for line in lines))
 
 
+# 管理画面は日時を世界標準時（末尾が Z）で保存する。日付は日本時間で出す（管理画面のプレビューと同じ）。
+# 日本には夏時間がないので、9時間ずらすだけでよい
+JST = timezone(timedelta(hours=9))
+
+
+def jst_date(ts: str):
+    return datetime.fromisoformat(ts.replace('Z', '+00:00')).astimezone(JST).date()
+
+
 def fmt_date(ts: str) -> str:
     try:
-        return datetime.fromisoformat(ts.replace('Z', '+00:00')).strftime('%Y.%m.%d')
+        return jst_date(ts).strftime('%Y.%m.%d')
     except Exception:
         return ts

@@ -9,7 +9,11 @@ import threading
 import unittest
 from pathlib import Path
 
+from googleapiclient.errors import HttpError
+from httplib2 import Response
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
+from sitebuild.html import fmt_date  # noqa: E402
 from sitebuild.sections import render_update_log  # noqa: E402
 import fetch_google_content as fetch  # noqa: E402
 
@@ -54,7 +58,14 @@ def published_state_rows(content, chunk=None):
     return [headers, ['2026-10-31T00:00:00.000Z', '1', 'hash'] + cells]
 
 
+def http_error(status):
+    """Google の API が返すのと同じ形のエラー。"""
+    return HttpError(Response({'status': status}), b'error')
+
+
 class FakeSheets:
+    """sheets に名前と値を渡す。値の代わりにエラーを渡すと、読むときにそのエラーになる。"""
+
     def __init__(self, sheets):
         self.sheets = sheets
 
@@ -67,7 +78,9 @@ class FakeSheets:
     def get(self, spreadsheetId, range):
         name = range.split('!')[0].strip("'")
         rows = self.sheets.get(name)
-        return FakeRequest(RuntimeError('Unable to parse range') if rows is None else {'values': rows})
+        if rows is None:
+            return FakeRequest(RuntimeError('Unable to parse range'))
+        return FakeRequest(rows if isinstance(rows, Exception) else {'values': rows})
 
 
 class FakeRequest:
@@ -87,6 +100,7 @@ class RecordingDrive:
         self.downloads = []
         self.cache_jobs = {}
         self.downloaded = 0
+        self.missing = set()
 
     def prefetch_meta(self, ids):
         self.prefetched = sorted(set(ids))
@@ -133,8 +147,19 @@ class ReadContentTest(unittest.TestCase):
                 sheets = FakeSheets({'_PublishedState': published_state_rows(CONTENT_V2, chunk)})
                 self.assertEqual(fetch.read_published_content(sheets, 'id'), CONTENT_V2)
 
-    def test_no_published_state_is_empty_content(self):
-        self.assertEqual(fetch.read_published_content(FakeSheets({}), 'id'), {})
+    def test_published_state_without_content_is_empty_content(self):
+        self.assertEqual(fetch.read_published_content(FakeSheets({'_PublishedState': []}), 'id'), {})
+
+    def test_a_missing_or_unreadable_published_state_stops_the_build(self):
+        for sheets in ({}, {'_PublishedState': http_error(503)}):
+            with self.subTest(sheets=sheets), self.assertRaises(Exception):
+                fetch.read_published_content(FakeSheets(sheets), 'id')
+
+    def test_the_change_log_is_empty_only_while_the_sheet_does_not_exist(self):
+        content = {'_PublishedState': published_state_rows(CONTENT_V2)}
+        self.assertEqual(build_snapshot(content)[0]['change_log'], [])
+        with self.assertRaises(HttpError):
+            build_snapshot(dict(content, ChangeLog=http_error(503)))
 
     def test_broken_published_state_stops_the_build(self):
         rows = published_state_rows(CONTENT_V2)
@@ -195,6 +220,13 @@ class UpdateLogTest(unittest.TestCase):
             '活動記録・告知「記事」', '新歓イベントカレンダーを更新', '部室を移りました'])
 
 
+class DateTest(unittest.TestCase):
+    def test_dates_are_in_japan_time(self):
+        # 管理画面は世界標準時で保存する。日本時間の朝9時より前は、世界標準時ではまだ前の日
+        self.assertEqual(fmt_date('2026-04-28T16:59:08.244Z'), '2026.04.29')
+        self.assertEqual(fmt_date('2026-10-30T07:52:25.528Z'), '2026.10.30')
+
+
 class Request:
     def __init__(self, file_id):
         self.file_id = file_id
@@ -213,7 +245,13 @@ class CacheDrive:
         return self
 
     def get(self, fileId, fields, supportsAllDrives):
-        return FakeRequest(self.files_by_id[fileId]['meta'] if fileId in self.files_by_id else RuntimeError('404'))
+        return FakeRequest(self.meta_or_error(fileId))
+
+    # 'denied' で始まる ID は読む権限がない（403）、知らない ID は Drive にない（404）
+    def meta_or_error(self, file_id):
+        if file_id.startswith('denied'):
+            return http_error(403)
+        return self.files_by_id[file_id]['meta'] if file_id in self.files_by_id else http_error(404)
 
     def get_media(self, fileId):
         with self.lock:
@@ -234,8 +272,9 @@ class Batch:
 
     def execute(self):
         for file_id in self.ids:
-            known = self.drive.files_by_id.get(file_id)
-            self.callback(file_id, known and known['meta'], None if known else RuntimeError('404'))
+            result = self.drive.meta_or_error(file_id)
+            error = result if isinstance(result, Exception) else None
+            self.callback(file_id, None if error else result, error)
 
 
 class CacheTest(unittest.TestCase):
@@ -287,6 +326,15 @@ class CacheTest(unittest.TestCase):
         self.assertEqual(removed, 8, 'サイトに使わなくなった画像はキャッシュから消す')
         kept = sorted(path.name for path in (self.root / 'cache').iterdir() if path.suffix != '.md5')
         self.assertEqual(kept, ['id0', 'id15', 'id3'])
+
+    def test_an_image_no_longer_in_drive_is_skipped_and_counted_but_other_errors_stop_the_build(self):
+        drive = fetch.DriveFiles(None, self.root / 'cache')
+        drive.prefetch_meta(['id0', 'gone'])
+        self.assertIsNone(drive.meta('gone'))
+        self.assertEqual(drive.missing, {'gone'})
+        for read in (lambda d: d.prefetch_meta(['denied1']), lambda d: d.meta('denied2')):
+            with self.assertRaises(RuntimeError):
+                read(fetch.DriveFiles(None, self.root / 'cache'))
 
 
 if __name__ == '__main__':
