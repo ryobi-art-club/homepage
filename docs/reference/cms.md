@@ -92,7 +92,7 @@ cms/
 |---|---|---|
 | `doGet()` | AppMain | `Ui.html` をテンプレートとして評価して返す。スマホ表示の指定（viewport）もここで付ける |
 | `include(filename)` | AppMain | `Ui.html` の `<?!= include('...'); ?>` から呼ばれ、画面のスクリプトと UiStyles を埋め込む |
-| `getConfig_()` | AppConfig | スクリプト プロパティをまとめて読む。必須の値が欠けていればエラーにする |
+| `getConfig_()` | AppConfig | 設定をまとめて読む（スクリプト プロパティになければ `CONFIG_DEFAULTS` の値）。必須の値が欠けていればエラーにする |
 | `CONTENT_SHEETS` | AppConfig | スプレッドシートのシート名の一覧 |
 | `requireString_()` / `cleanMultiline_()` | AppUtil | 入力の空欄・文字数のチェック |
 | `stableStringify_()` | AppUtil | 項目の順番をそろえた JSON。内容が変わったかを比べるのに使う |
@@ -112,7 +112,7 @@ cms/
 | 確認コードの有効期限 | 10分（`OTP_TTL_MINUTES`） |
 | 確認コードの入力間違い | 5回で無効 |
 | 確認コードの送信 | 同じアドレスに6時間で5回まで |
-| ログインの有効期限 | 既定は30分、現在の設定は180分（`SESSION_TTL_MINUTES`）。ログインした時点から数える |
+| ログインの有効期限 | 180分（`SESSION_TTL_MINUTES`）。ログインした時点から数える |
 
 ### `ContentApi.js` — 画面から呼ばれる入口（内容と公開）
 
@@ -214,35 +214,37 @@ Drive とスプレッドシートの更新全体は、途中で失敗しても�
 
 ## Script Properties（設定値）
 
-GAS エディタの「プロジェクトの設定」→「スクリプト プロパティ」で設定します。
+GAS エディタの「プロジェクトの設定」→「スクリプト プロパティ」で設定します。スクリプト プロパティに置くのは、秘密の値・作り直すと変わる ID・メールアドレスだけです。それ以外の設定はコードにあります。管理画面を動かしながら変えることがある値は `AppConfig.js` の `CONFIG_DEFAULTS` にあり、スクリプト プロパティに同じ名前で書くと、デプロイし直さずに上書きできます。デプロイのときに変えればよい値は、ほかの決まった数字（確認コードの送信の上限など）と同じく、使うファイルの先頭の定数です（[設計の判断](../decisions.md)）。
 
-**必須**
+**スクリプト プロパティに置くもの**
 
 | 名前 | 内容 |
 |---|---|
-| `CONTENT_SPREADSHEET_ID` | コンテンツ用スプレッドシートの ID（URL の `/d/` と `/edit` の間） |
-| `ALLOWLIST_SPREADSHEET_ID` | 許可リスト用スプレッドシートの ID |
-| `ROOT_RECRUIT_FOLDER_ID` | 新歓カレンダーの画像を置く Drive フォルダの ID |
-| `ROOT_ACTIVITY_FOLDER_ID` | 活動記録の画像を置くフォルダの ID |
-| `ROOT_EXHIBITION_FOLDER_ID` | 展示会の画像を置くフォルダの ID |
-| `ROOT_REQUEST_FOLDER_ID` | ご依頼事例の画像を置くフォルダの ID |
-| `GH_OWNER` | GitHub の organization 名（`ryobi-art-club`） |
-| `GH_REPO` | 公開サイトのリポジトリ名（`homepage`） |
-| `GH_WORKFLOW_FILE` | ワークフローのファイル名（`deploy.yml`） |
-| `GH_BRANCH` | ワークフローを動かすブランチ（`main`） |
+| `CONTENT_SPREADSHEET_ID` | 必須。コンテンツ用スプレッドシートの ID（URL の `/d/` と `/edit` の間） |
+| `ALLOWLIST_SPREADSHEET_ID` | 必須。許可リスト用スプレッドシートの ID |
+| `ROOT_RECRUIT_FOLDER_ID` | 必須。新歓カレンダーの画像を置く Drive フォルダの ID |
+| `ROOT_ACTIVITY_FOLDER_ID` | 必須。活動記録の画像を置くフォルダの ID |
+| `ROOT_EXHIBITION_FOLDER_ID` | 必須。展示会の画像を置くフォルダの ID |
+| `ROOT_REQUEST_FOLDER_ID` | 必須。ご依頼事例の画像を置くフォルダの ID |
 | `GH_APP_ID` / `GH_INSTALLATION_ID` / `GH_PRIVATE_KEY` | GitHub App の ID・インストール ID・秘密鍵。秘密鍵は PEM 形式で、改行は `\n` と書く。App にはこのリポジトリの `Actions: Read and write` 権限が必要。欠けていると、「公開する」のサイトのビルドの起動だけが失敗する |
+| `GEMINI_API_KEY` | 目録の読み取りと誤字チェック。未設定なら目録の読み取りは使えず、誤字チェックはせずに公開する |
+| `ERROR_NOTIFY_EMAIL` | エラーの通知先（カンマ区切りで複数可）。未設定なら通知せず、部員が画面からコピーして連絡する。いまは開発用の Google アカウントのアドレスにしている |
 
-**任意**
+**`CONFIG_DEFAULTS` にあるもの**（動かしながら変えたいときだけ、スクリプト プロパティに書く）
 
-| 名前 | 既定値 | 内容 |
+| 名前 | 今の値 | 内容 |
 |---|---|---|
-| `SESSION_TTL_MINUTES` | 30 | ログインの有効期限（分）。**現在は180に設定** |
-| `OTP_TTL_MINUTES` | 10 | 確認コードの有効期限（分） |
-| `SITE_PREVIEW_URL` | `https://{GH_OWNER}.github.io/{GH_REPO}/` | 「サイトを開く」のリンク先 |
-| `GEMINI_API_KEY` | なし | 目録の読み取りと誤字チェック。未設定なら目録の読み取りは使えず、誤字チェックはせずに公開する |
-| `GEMINI_MODEL` | `gemini-3.1-flash-lite` | 使う Gemini のモデル |
-| `ERROR_NOTIFY_EMAIL` | なし | エラーの通知先（カンマ区切りで複数可）。未設定なら通知せず、部員が画面からコピーして連絡する。いまは開発用の Google アカウント（管理画面を反映しているアカウント）のアドレスにしている |
-| `CLEANUP_MODE` | なし | `trash` にすると、公開のあとの片付けで対象を Drive のゴミ箱に入れる。それ以外（未設定）は、片付けの対象を `_AdminLog` の `cleanup` の列に書くだけで、何も消さない。いまは `trash` |
+| `SESSION_TTL_MINUTES` | 180 | ログインの有効期限（分） |
+| `GEMINI_MODEL` | `gemini-3.1-flash-lite` | 使う Gemini のモデル。提供が終わったら変える |
+| `CLEANUP_MODE` | `trash` | `trash` なら、公開のあとの片付けで対象を Drive のゴミ箱に入れる。それ以外の値（例：`log`）にすると、片付けの対象を `_AdminLog` の `cleanup` の列に書くだけで、何も消さない。片付けがおかしいときに止める |
+
+**コードの定数**（変えるときはコードを直してデプロイする。スクリプト プロパティでは変えられない）
+
+| 定数 | ファイル | 今の値 |
+|---|---|---|
+| `GH_OWNER` / `GH_REPO` | `ContentSiteBuild.js` | `ryobi-art-club` / `homepage`。「サイトを開く」のリンク先 `SITE_URL` もここから作る |
+| `GH_WORKFLOW_FILE` / `GH_BRANCH` | `ContentSiteBuild.js` | `deploy.yml` / `main`（ワークフローの名前を変えたら一緒に直す） |
+| `OTP_TTL_MINUTES` | `AppAuth.js` | 10（確認コードの有効期限・分）。同じファイルに送信や入力間違いの上限もある |
 
 ## ログインの仕組み
 

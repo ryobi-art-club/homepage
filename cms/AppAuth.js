@@ -1,5 +1,8 @@
 // ログイン：確認コード・許可リスト・セッション
 
+// 確認コードの有効期限（分）
+const OTP_TTL_MINUTES = 10;
+
 // 確認コードの送信は、1つのアドレスにつき6時間に5通まで（1日でも最大20通）。部員のアドレスを知っている人が送らせ続けても、
 // Apps Script の1日のメールの上限（無料のアカウントで100通）を1つのアドレスでは使い切れないようにする。
 // 期間は CacheService が覚えておける最長の6時間
@@ -25,7 +28,6 @@ const OTP_MAIL_DEFAULT_MS = 1000;
 // 違うコードを入れたときの表示・回数の上限・ログインを止める動き・答えが返るまでの時間も同じになる。
 // 外の人が、部員のアドレスかどうかを確かめられないようにするため
 function requestOtp(email) {
-  const config = getConfig_();
   const normalizedEmail = normalizeEmail_(email);
   if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
     throw new Error('メールアドレスの形式が正しくありません。');
@@ -43,10 +45,10 @@ function requestOtp(email) {
   const record = {
     email: normalizedEmail,
     codeHash: sha256Hex_(code),
-    expiresAt: Date.now() + config.OTP_TTL_MINUTES * 60 * 1000,
+    expiresAt: Date.now() + OTP_TTL_MINUTES * 60 * 1000,
     attempts: 0
   };
-  cache.put('otp:' + normalizedEmail, JSON.stringify(record), config.OTP_TTL_MINUTES * 60);
+  cache.put('otp:' + normalizedEmail, JSON.stringify(record), OTP_TTL_MINUTES * 60);
 
   if (readAllowedUser_(normalizedEmail)) {
     const started = Date.now();
@@ -56,14 +58,14 @@ function requestOtp(email) {
       htmlBody: [
         '<p>凌美会の管理画面にログインするための確認コードです。</p>',
         '<p style="font-size:28px; font-weight:700; letter-spacing:0.2em;">' + code + '</p>',
-        '<p>このコードの有効期限は ' + config.OTP_TTL_MINUTES + ' 分です。</p>'
+        '<p>このコードの有効期限は ' + OTP_TTL_MINUTES + ' 分です。</p>'
       ].join('')
     });
     rememberOtpMailTime_(cache, Date.now() - started);
   } else {
     Utilities.sleep(pickOtpMailTime_(cache));
   }
-  return { ok: true, email: maskEmail_(normalizedEmail), expiresInMinutes: config.OTP_TTL_MINUTES };
+  return { ok: true, email: maskEmail_(normalizedEmail), expiresInMinutes: OTP_TTL_MINUTES };
 }
 
 function verifyOtp(email, code) {

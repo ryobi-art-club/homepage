@@ -10,46 +10,40 @@ const CONTENT_SHEETS = {
 
 const ALLOWLIST_SHEET_NAME = 'allowlist';
 
+// 管理画面を動かしながら変えることがある設定の、今の値。スクリプト プロパティに同じ名前で値を書くと、
+// デプロイし直さずにそちらが使われる。デプロイのときに変えればよい値は、使うファイルの先頭の定数にする
+const CONFIG_DEFAULTS = {
+  // 部員から「すぐ切れる」「長すぎる」と言われたときに変える
+  SESSION_TTL_MINUTES: '180',
+  // モデルの提供は急に終わることがある
+  GEMINI_MODEL: 'gemini-3.1-flash-lite',
+  // 'trash' なら公開のあとの片付けの対象を Drive のゴミ箱に入れる。それ以外（例：'log'）は _AdminLog に一覧を書くだけ。
+  // 片付けがおかしいときに、すぐ止められるように
+  CLEANUP_MODE: 'trash'
+};
+
+// スクリプト プロパティに必ず置く値（作り直すと変わる ID）。ほかに GitHub App の値・Gemini の API キーもプロパティから読む
+const CONFIG_REQUIRED = [
+  'CONTENT_SPREADSHEET_ID',
+  'ALLOWLIST_SPREADSHEET_ID',
+  'ROOT_RECRUIT_FOLDER_ID',
+  'ROOT_ACTIVITY_FOLDER_ID',
+  'ROOT_EXHIBITION_FOLDER_ID',
+  'ROOT_REQUEST_FOLDER_ID'
+];
+
 function getConfig_() {
   const props = PropertiesService.getScriptProperties();
-  const required = [
-    'CONTENT_SPREADSHEET_ID',
-    'ALLOWLIST_SPREADSHEET_ID',
-    'ROOT_RECRUIT_FOLDER_ID',
-    'ROOT_ACTIVITY_FOLDER_ID',
-    'ROOT_EXHIBITION_FOLDER_ID',
-    'ROOT_REQUEST_FOLDER_ID',
-    'GH_OWNER',
-    'GH_REPO',
-    'GH_WORKFLOW_FILE',
-    'GH_BRANCH'
-  ];
+  const read = (key) => String(props.getProperty(key) || CONFIG_DEFAULTS[key] || '').trim();
   const config = {};
-  required.forEach((key) => {
-    config[key] = String(props.getProperty(key) || '').trim();
-  });
-  const missing = required.filter((key) => !config[key]);
+  CONFIG_REQUIRED.concat(Object.keys(CONFIG_DEFAULTS), ['GH_APP_ID', 'GH_INSTALLATION_ID', 'GEMINI_API_KEY'])
+    .forEach((key) => { config[key] = read(key); });
+  const missing = CONFIG_REQUIRED.filter((key) => !config[key]);
   if (missing.length) {
     throw new Error('Script Properties が不足しています: ' + missing.join(', '));
   }
-
-  config.OTP_TTL_MINUTES = parseInt(props.getProperty('OTP_TTL_MINUTES') || '10', 10);
-  config.SESSION_TTL_MINUTES = parseInt(props.getProperty('SESSION_TTL_MINUTES') || '30', 10);
-  const explicitPreviewUrl = String(props.getProperty('SITE_PREVIEW_URL') || '').trim();
-  config.SITE_PREVIEW_URL = explicitPreviewUrl || buildDefaultPreviewUrl_(config);
-  config.GH_APP_ID = String(props.getProperty('GH_APP_ID') || '').trim();
-  config.GH_INSTALLATION_ID = String(props.getProperty('GH_INSTALLATION_ID') || '').trim();
+  config.SESSION_TTL_MINUTES = parseInt(config.SESSION_TTL_MINUTES, 10);
+  config.CLEANUP_MODE = config.CLEANUP_MODE.toLowerCase();
   config.GH_PRIVATE_KEY = String(props.getProperty('GH_PRIVATE_KEY') || '').replace(/\\n/g, '\n');
-  config.GEMINI_API_KEY = String(props.getProperty('GEMINI_API_KEY') || '').trim();
-  config.GEMINI_MODEL = String(props.getProperty('GEMINI_MODEL') || 'gemini-3.1-flash-lite').trim();
-  // 'trash' なら片付けの対象を Drive のゴミ箱に入れる。それ以外は _AdminLog に一覧を書くだけ
-  config.CLEANUP_MODE = String(props.getProperty('CLEANUP_MODE') || '').trim().toLowerCase();
   return config;
-}
-
-function buildDefaultPreviewUrl_(config) {
-  const owner = String(config.GH_OWNER || '').trim();
-  const repo = String(config.GH_REPO || '').trim();
-  if (!owner || !repo) return '';
-  return 'https://' + owner + '.github.io/' + repo + '/';
 }

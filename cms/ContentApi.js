@@ -8,7 +8,7 @@ function getBootstrapData(sessionToken) {
   return sanitizeForClient_({
     viewerEmail: session.email,
     viewerName: session.name || session.email,
-    previewUrl: getConfig_().SITE_PREVIEW_URL,
+    previewUrl: SITE_URL,
     state: state,
     drafts: readDrafts_(source),
     adminLog: readAdminLog_(source),
