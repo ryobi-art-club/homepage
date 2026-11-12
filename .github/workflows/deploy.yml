@@ -36,9 +36,12 @@ jobs:
       - name: Run tests
         run: python -m unittest discover tests
 
+      # 秘密の値は環境変数で渡す（コマンドの文字に直接埋め込むと、値に ' などが入ったときにコマンドが壊れるため）
       - name: Restore Google service account key
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
         run: |
-          printf '%s' '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > /tmp/service-account.json
+          printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" > /tmp/service-account.json
 
       # 前回のビルドで取得した画像。公開リポジトリのキャッシュは、プルリクエストを作れる人なら誰でも
       # 読めるので、今のサイトに載っている画像だけを入れる（docs/reference/site.md の「画像のキャッシュ」）
@@ -50,12 +53,15 @@ jobs:
           restore-keys: drive-images-
 
       - name: Fetch Google content snapshot
+        env:
+          CONTENT_SPREADSHEET_ID: ${{ secrets.CONTENT_SPREADSHEET_ID }}
         run: |
           python scripts/fetch_google_content.py \
             --service-account-json /tmp/service-account.json \
-            --content-spreadsheet-id '${{ secrets.CONTENT_SPREADSHEET_ID }}' \
+            --content-spreadsheet-id "$CONTENT_SPREADSHEET_ID" \
             --output-json build/runtime/content_snapshot.json \
-            --assets-dir build/runtime/assets             --cache-dir build/cache/drive
+            --assets-dir build/runtime/assets \
+            --cache-dir build/cache/drive
 
       - name: Build static site
         run: |
@@ -84,7 +90,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh cache list --repo "$GITHUB_REPOSITORY" --key drive-images- --limit 100 --json key --jq '.[].key'             | { grep -vx "$IMAGE_CACHE_KEY" || true; }             | while read -r key; do gh cache delete "$key" --repo "$GITHUB_REPOSITORY"; done
+          gh cache list --repo "$GITHUB_REPOSITORY" --key drive-images- --limit 100 --json key --jq '.[].key' \
+            | { grep -vx "$IMAGE_CACHE_KEY" || true; } \
+            | while read -r key; do gh cache delete "$key" --repo "$GITHUB_REPOSITORY"; done
 
   deploy:
     needs: build
