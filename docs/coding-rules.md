@@ -68,7 +68,7 @@
 |---|---|---|
 | 人（管理者・後任） | 日本語 | `README.md`（全体の地図）・`docs/`（手順・調べる用・判断）・コードのコメント |
 | 部員・サイトを見る人 | 日本語 | 管理画面と公開サイトの画面の言葉 |
-| AI | 英語 | `AGENTS.md`・`cms/AGENTS.md` |
+| AI | 英語 | `AGENTS.md` |
 
 - 人が読む資料は、読み手がそのとき何をしたいかで分けています：全体をつかむ（`README.md`）、順を追って作業する（`docs/operations.md`・`docs/development.md`・`docs/setup.md`）、症状から探す（`docs/troubleshooting.md`）、細部を調べる（`docs/reference/`）、理由を知る（`docs/decisions.md`）。
 - 手順書は、番号付きの手順で書き、理由は書かずに `docs/decisions.md` へリンクします。調べる用の資料は表と一覧で書き、手順は書きません。

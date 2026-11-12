@@ -229,10 +229,9 @@ node tools/screenshot/compare.cjs <控えのフォルダ>          # 作業の�
 
 `clasp push` で送るのはテスト用の版だけです。部員が使っている本番の管理画面は、手順4のデプロイまで変わりません。
 
-1. `cms/` で `clasp push` を実行する。`.claspignore` に書いたもの（`tests/`・`tools/`・README など）は送られない。
+1. リポジトリの直下で `clasp -P cms push` を実行する（`-P cms` で `cms/.clasp.json` を使う。`cms/` に移らなくてよい）。`cms/.claspignore` に書いたもの（`tests/`・`tools/` など）は送られない。
    ```bash
-   cd cms
-   clasp push
+   clasp -P cms push
    ```
 2. 確かめたいときは、GAS エディタの「デプロイ」→「デプロイをテスト」の URL（末尾が `/dev`）で、テスト用の版を開く。
 3. GAS エディタで「デプロイ」→「デプロイを管理」を開き、本番のデプロイを選んで「編集」（鉛筆）を押す。

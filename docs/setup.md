@@ -4,7 +4,7 @@ Google のアカウントや GitHub の設定を失ったときなど、シス�
 
 1. **スプレッドシートを2つ作る**：コンテンツ用（中は空でよい。シートは自動で作られる）と、許可リスト用（`allowlist` シートに `name` / `email` の見出しと、最初の管理者の行を書く）。
 2. **Drive にルートフォルダを4つ作る**：新歓・活動記録・展示会・ご依頼。
-3. **GAS プロジェクトを用意して、コードを送る**：`clasp login` のあと、`cms/.clasp.json` の `scriptId` を自分のプロジェクトの ID にして、`cms/` で `clasp push`。
+3. **GAS プロジェクトを用意して、コードを送る**：`clasp login` のあと、`cms/.clasp.json` の `scriptId` を自分のプロジェクトの ID にして、リポジトリの直下で `clasp -P cms push`。
 4. **スクリプト プロパティを設定する**（[Script Properties（設定値）](reference/cms.md#script-properties設定値)）。
 5. **ウェブアプリとしてデプロイする**：GAS エディタの「デプロイ」→「新しいデプロイ」→ 種類「ウェブアプリ」。実行するユーザーは「自分」、アクセスできるユーザーは「Google アカウントを持つ全員」。表示された URL が管理画面の URL です。初回は権限の許可を求められます。
 6. **サービスアカウントを作る**：[Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作り、「Google Sheets API」と「Google Drive API」を有効にする。サービスアカウントを作り、鍵（JSON）を作ってダウンロードする。
