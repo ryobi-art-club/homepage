@@ -10,6 +10,7 @@
 import json
 import re
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -22,6 +23,8 @@ FORBIDDEN_TEXT = {
 }
 # 見本用に予約されたドメイン（RFC 2606）
 EXAMPLE_DOMAIN = re.compile(r'(^|\.)example\.(com|org|net)$|\.(test|example|invalid)$')
+# 画像など、文字ではないファイル（中は調べない）
+BINARY_FILES = re.compile(r'\.(png|jpe?g|gif|webp|ico|pdf|woff2?|pyc)$', re.I)
 FORBIDDEN_FILES = re.compile(r'(\.xlsx|\.xls|(^|/)\.clasprc\.json|service-account[^/]*\.json)$', re.I)
 
 
@@ -36,6 +39,19 @@ def tracked_files() -> list[str]:
         skip = {'.git', 'node_modules', 'out', 'build', 'dist', '__pycache__'}
         return [str(path.relative_to(ROOT)).replace('\\', '/') for path in ROOT.rglob('*')
                 if path.is_file() and not skip.intersection(path.relative_to(ROOT).parts)]
+
+
+def read_text(path: Path) -> str:
+    """文字のファイルを読む。Windows の PowerShell が作る UTF-16 や、Shift_JIS のファイルも読む（読めないファイルを飛ばすと見落とすため）。"""
+    data = path.read_bytes()
+    if data.startswith((b'\xff\xfe', b'\xfe\xff')):
+        return data.decode('utf-16')
+    for encoding in ('utf-8-sig', 'cp932'):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode('latin-1')
 
 
 def allowed_emails() -> set[str]:
@@ -53,10 +69,9 @@ class RepositoryContentsTest(unittest.TestCase):
             if FORBIDDEN_FILES.search(name):
                 problems.append(f'{name}：公開してはいけない種類のファイル')
                 continue
-            try:
-                text = (ROOT / name).read_text(encoding='utf-8')
-            except (UnicodeDecodeError, FileNotFoundError):
+            if BINARY_FILES.search(name) or not (ROOT / name).is_file():
                 continue
+            text = read_text(ROOT / name)
             for address in EMAIL.findall(text):
                 domain = address.lower().split('@')[1]
                 if address.lower() not in allowed and not EXAMPLE_DOMAIN.search(domain):
@@ -65,6 +80,14 @@ class RepositoryContentsTest(unittest.TestCase):
                 if pattern.search(text):
                     problems.append(f'{name}：{label}')
         self.assertEqual(problems, [], '公開してはいけないものが入っています：\n' + '\n'.join(problems))
+
+    def test_text_in_any_windows_encoding_is_read(self):
+        # PowerShell の echo は UTF-16 で書く。読めないファイルを飛ばすと見落とすので、どの形でも読めること
+        with tempfile.TemporaryDirectory() as folder:
+            for encoding in ('utf-8', 'utf-16', 'cp932'):
+                path = Path(folder) / encoding
+                path.write_text('連絡先 check@example.test', encoding=encoding)
+                self.assertEqual(EMAIL.findall(read_text(path)), ['check@example.test'], encoding)
 
 
 if __name__ == '__main__':
