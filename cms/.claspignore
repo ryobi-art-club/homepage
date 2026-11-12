@@ -1,0 +1,11 @@
+.clasp.json
+.git/**
+.env
+.env.*
+*.log
+README.md
+AGENTS.md
+CLAUDE.md
+tests/**
+tools/**
+node_modules/**

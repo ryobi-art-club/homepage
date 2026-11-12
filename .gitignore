@@ -1,11 +1,18 @@
 __pycache__/
 build/
 dist/
+node_modules/
+.env
+.env.*
+*.log
+Thumbs.db
+.DS_Store
 # Never commit Google credentials
 *service-account*.json
 *-key.json
 tools/screenshot/out/
-tools/screenshot/node_modules/
+# 管理画面の手元のプレビュー（見本のデータで作った画面と撮影）
+cms/tools/preview/out/
 # 部員の情報が入りやすいファイル（tests/test_repository_contents.py でも止める）
 *.xlsx
 *.xls

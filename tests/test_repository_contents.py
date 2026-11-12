@@ -27,7 +27,9 @@ FORBIDDEN_FILES = re.compile(r'(\.xlsx|\.xls|(^|/)\.clasprc\.json|service-accoun
 
 def tracked_files() -> list[str]:
     try:
-        output = subprocess.run(['git', 'ls-files'], cwd=ROOT, capture_output=True, text=True, check=True).stdout
+        # まだ git add していないファイルも見る（.gitignore で除いたものは見ない）
+        output = subprocess.run(['git', 'ls-files', '--cached', '--others', '--exclude-standard'],
+                                cwd=ROOT, capture_output=True, text=True, check=True).stdout
         return [line for line in output.splitlines() if line]
     except (OSError, subprocess.CalledProcessError):
         # Git がない所では、作業用のフォルダを除いて全部を見る

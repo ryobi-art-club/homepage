@@ -1,0 +1,707 @@
+<script>
+/* タブごとの入力欄：ホーム・新歓・活動記録・展示会・ご依頼・更新履歴
+   内容の置き場所は appState.state だけ。入力欄に打ち込むとすぐ appState.state に入り、
+   描き直し・プレビュー・保存・公開はどれも appState.state から作る */
+
+function ensureRecruitCalendars() {
+  if (Array.isArray(appState.state.recruitCalendars) && appState.state.recruitCalendars.length) return;
+  appState.state.recruitCalendars = [{ year: String(new Date().getFullYear()), mediaFolderId: '', mediaFileIds: [], published: true }];
+}
+
+function recruitYear(value) {
+  return String(value || '').replace(/[^\d]/g, '').slice(0, 4);
+}
+
+function recruitCalendarLabel(year) {
+  return year ? year + '年度 新歓イベントカレンダー' : '新歓イベントカレンダー';
+}
+
+function activityCategoryLabel(category) {
+  const labels = { record: '活動記録', event: 'イベント告知', other: 'その他' };
+  return labels[String(category || 'record')] || 'その他';
+}
+
+const STORAGE_LEVEL_TEXT = { ok: '余裕があります', notice: '注意', warning: '警告', danger: '強い警告' };
+
+function renderStorageCard() {
+  const maintenance = appState.maintenance || {};
+  const storage = maintenance.storage || {};
+  const recommendations = maintenance.recommendations || [];
+  if (!storage.available) {
+    return html`
+      <div class="card storage-card is-unknown">
+        <h3>Drive容量</h3>
+        <div class="small-note">${storage.message || 'Drive容量を取得できませんでした。'}</div>
+      </div>`;
+  }
+  const level = storage.level || 'ok';
+  const pct = storage.limit ? Math.round((storage.usageRatio || 0) * 1000) / 10 : 0;
+  return html`
+    <div class="card storage-card is-${level}">
+      <div class="storage-head">
+        <div data-help>
+          <div class="help-title"><h3>Drive容量</h3>${HELP_BUTTON}</div>
+          <div class="small-note help-text">ホームページ素材以外も含む、実行アカウント全体の容量です。</div>
+        </div>
+        <span class="storage-badge">${STORAGE_LEVEL_TEXT[level]}</span>
+      </div>
+      <div class="storage-meter"><span style="width:${Math.min(100, Math.max(0, pct))}%"></span></div>
+      <div class="storage-row">
+        <span>使用中 ${formatBytes(storage.used)} / ${formatBytes(storage.limit)}</span>
+        <strong>残り ${formatBytes(storage.remaining)}</strong>
+      </div>
+      ${level !== 'ok' && renderStorageRecommendations(storage, recommendations)}
+    </div>`;
+}
+
+function renderStorageRecommendations(storage, recommendations) {
+  if (!recommendations.length) return html`<div class="small-note">容量を確保できる退避候補はありません。</div>`;
+  return html`
+    <div class="recommendation-list">
+      <div class="small-note">退避候補（合計 ${formatBytes(storage.recommendationBytes || 0)}）</div>
+      ${recommendations.map((item) => html`
+        <div class="recommendation-item">
+          <div>
+            <span class="recommendation-kind">${item.label}</span>
+            <strong>${item.title}</strong>
+            <span class="small-note">${formatDate(item.date) || '日付なし'}${item.published === false && ' / 非公開'} / ${formatBytes(item.size || 0)}</span>
+          </div>
+          <a class="button subtle" href="${item.folderUrl || '#'}" target="_blank" rel="noopener noreferrer">Driveで開く</a>
+        </div>`)}
+      <div class="small-note">${storage.recommendationSufficient
+        ? 'すべて退避した場合の見込み残量: ' + formatBytes(storage.projectedRemaining || storage.remaining)
+        : '登録済み素材をすべて退避しても、十分な空き容量に届かない見込みです。'}</div>
+    </div>`;
+}
+
+function renderDashboard() {
+  const state = appState.state || {};
+  const publishedCount = (items) => (items || []).filter((item) => item.published !== false).length;
+  const drafts = appState.drafts || [];
+  const adminLog = appState.adminLog || [];
+  /* 更新履歴は1つの変更が1行なので、公開の回数は日時の数で数える */
+  const publishCount = new Set((state.changeLog || []).map((row) => row.timestamp)).size;
+  document.getElementById('panel-dashboard').innerHTML = html`
+    <div class="stack">
+      ${(appState.viewerName || appState.viewerEmail) && html`
+        <p class="dashboard-account">ログイン中：<strong>${appState.viewerName || appState.viewerEmail}</strong>${appState.viewerEmail && appState.viewerEmail !== appState.viewerName && html`（${appState.viewerEmail}）`}</p>`}
+      ${renderStorageCard()}
+      <div class="card">
+        <h2>概要</h2>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-label">活動記録・告知</div><div class="kpi-value">${publishedCount(state.activityArticles)}</div></div>
+          <div class="kpi"><div class="kpi-label">展示会</div><div class="kpi-value">${publishedCount(state.exhibitions)}</div></div>
+          <div class="kpi"><div class="kpi-label">取り組み事例</div><div class="kpi-value">${publishedCount(state.requestCases)}</div></div>
+          <div class="kpi"><div class="kpi-label">公開履歴</div><div class="kpi-value">${publishCount}</div></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>下書き一覧</h3>
+          <div class="log-list">${drafts.length
+            ? drafts.map((item) => html`
+              <div class="log-item draft-item">
+                <div class="log-date">${formatDate(item.savedAt)} / ${item.savedByName || item.savedByEmail}</div>
+                <div class="draft-actions-row">
+                  <div>下書き ${(item.draftId || '').slice(0, 8)}</div>
+                  <button class="button subtle" type="button" onclick="loadDraftIntoEditor('${jsString(item.draftId)}')">読み込む</button>
+                </div>
+              </div>`)
+            : html`<div class="small-note">保存済みの下書きはありません。</div>`}</div>
+        </div>
+        <div class="card">
+          <h3>公開履歴</h3>
+          <div class="log-list log-list-scroll">${adminLog.length
+            ? adminLog.map((item) => html`
+              <div class="log-item">
+                <div class="log-date">${formatDate(item.timestamp)} / ${item.actorName || item.actorEmail || '不明'}</div>
+                <div>${item.detail || item.action}</div>
+              </div>`)
+            : html`<div class="small-note">まだ公開履歴がありません。</div>`}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ---------- 一覧と入力欄 ----------
+   一覧の項目は <article data-editor="種類" data-index="一覧での位置">、入力欄は data-field（項目の名前）を持つ。
+   展示会と新歓は、描くときに appState.state の並びを画面の並びにそろえるので、data-index はそのまま一覧の位置になる */
+const EDITOR_LISTS = {
+  recruit: { listName: 'recruitCalendars', render: () => renderRecruitEditor(), sort: (items) => sortRecruitCalendars(items), toPayload: (item) => recruitPayload(item) },
+  activity: { listName: 'activityArticles', noun: '記事', untitled: '新規記事', render: () => renderActivitiesEditor(), toPayload: (item) => activityPayload(item) },
+  exhibition: { listName: 'exhibitions', noun: '展示会', untitled: '新規展示会', render: () => renderExhibitionsEditor(), sort: (items) => sortExhibitions(items), toPayload: (item) => exhibitionPayload(item) },
+  request: { listName: 'requestCases', noun: '事例', untitled: '新規事例', render: () => renderRequestsEditor(), toPayload: (item) => requestPayload(item) }
+};
+
+function editorItems(kind) {
+  const listName = EDITOR_LISTS[kind].listName;
+  if (!Array.isArray(appState.state[listName])) appState.state[listName] = [];
+  return appState.state[listName];
+}
+
+/* 更新履歴メモ（logs）は一覧の項目ではないので、appState.state に直接持つ */
+function editorTarget(kind, index) {
+  return kind === 'logs' ? appState.state : editorItems(kind)[index];
+}
+
+function editorSelector(kind, index) {
+  return kind === 'logs' ? '[data-editor="logs"]' : `[data-editor="${kind}"][data-index="${index}"]`;
+}
+
+function editorItemOf(element) {
+  const holder = element.closest('[data-editor]');
+  return editorTarget(holder.getAttribute('data-editor'), Number(holder.getAttribute('data-index')));
+}
+
+function editorItemTitle(kind, item) {
+  if (kind === 'recruit') return recruitCalendarLabel(recruitYear(item.year));
+  return String(item.title || '').trim() || EDITOR_LISTS[kind].untitled;
+}
+
+function onEditorInput(input) {
+  const holder = input.closest('[data-editor]');
+  setEditorField(holder.getAttribute('data-editor'), Number(holder.getAttribute('data-index')), input.getAttribute('data-field'), input.value);
+}
+
+/* 値を入れて、見出しとプレビューを合わせる（入力欄の値は変えない。入力欄からでないときは呼ぶ側で入れる） */
+function setEditorField(kind, index, field, value) {
+  editorTarget(kind, index)[field] = value;
+  if (kind === 'logs') {
+    scheduleLogsPreviewRefresh();
+    return;
+  }
+  const title = document.querySelector(editorSelector(kind, index) + ' [data-live-title]');
+  if (title) title.textContent = editorItemTitle(kind, editorTarget(kind, index));
+  refreshPreview(kind);
+}
+
+/* 一覧の形を変える操作（追加・削除・並べ替え・公開の切り替えなど）のあと：未保存の印を付けて、そのタブを描き直す */
+function commitEditorChange(kind) {
+  markDirty();
+  EDITOR_LISTS[kind].render();
+}
+
+function renderEditorPanel(kind, panelId, heading, lead, addButton, items, renderItem) {
+  document.getElementById(panelId).innerHTML = html`
+    <div class="grid-2">
+      <div class="card">
+        <div class="panel-head" data-help>
+          <div>
+            <div class="help-title">
+              <h2>${heading}</h2>
+              ${HELP_BUTTON}
+            </div>
+            <p class="panel-lead help-text">${lead}</p>
+          </div>
+          <div class="item-actions">${addButton}</div>
+        </div>
+        <div class="editor-list">${items.map(renderItem)}</div>
+      </div>
+      <div class="card">
+        <h3>プレビュー</h3>
+        <div id="${kind}Preview" class="preview-pane preview-frame">${previewPlaceholderHtml(kind)}</div>
+      </div>
+    </div>`;
+  refreshPreview(kind);
+}
+
+function renderPublishToggle(kind, index, published) {
+  return html`<button class="button hidden-toggle${!published && html` is-hidden`}" type="button" onclick="toggleItemPublished('${kind}', ${index})">${published ? '非公開' : '公開に戻す'}</button>`;
+}
+
+function renderRemoveButton(onclick) {
+  return html`<button class="button danger icon" type="button" onclick="${onclick}" aria-label="削除" title="削除">${TRASH_ICON}</button>`;
+}
+
+function renderMediaButton(kind, index, label) {
+  return html`<button class="button subtle" type="button" onclick="openMediaDialog('${kind}', ${index})">${label}</button>`;
+}
+
+/* ---------- 新歓 ---------- */
+function sortRecruitCalendars(items) {
+  return (items || []).slice().sort((a, b) => recruitYear(b.year).localeCompare(recruitYear(a.year)));
+}
+
+function renderRecruitEditor() {
+  ensureRecruitCalendars();
+  appState.state.recruitCalendars = sortRecruitCalendars(appState.state.recruitCalendars);
+  renderEditorPanel('recruit', 'panel-recruit', '入部希望の方',
+    '年度ごとの新歓イベントカレンダー画像を設定します。表示名は年度から自動で作られます。',
+    html`<button class="button" type="button" onclick="addRecruitYear()">年度を追加</button>`,
+    appState.state.recruitCalendars, renderRecruitEditorItem);
+}
+
+function renderRecruitEditorItem(item, index) {
+  const published = item.published !== false;
+  return html`
+    <article class="editor-item" data-editor="recruit" data-index="${index}">
+      <div class="editor-item-head">
+        <div>
+          <div class="item-title" data-live-title>${editorItemTitle('recruit', item)}</div>
+          <div class="editor-item-meta">${visibleChipHtml(published)}</div>
+        </div>
+        <div class="item-actions">
+          ${!published && html`<button class="button hidden-toggle is-hidden" type="button" onclick="publishRecruitYear(${index})">この年度を公開</button>`}
+          ${renderRemoveButton(`removeRecruitYear(${index})`)}
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>年度</label>
+          <input data-field="year" inputmode="numeric" value="${recruitYear(item.year)}" placeholder="2026" oninput="onEditorInput(this)" onchange="renderRecruitEditor()">
+        </div>
+        <div class="field full">
+          <label>画像</label>
+          ${renderMediaButton('recruit', index, '画像の設定')}
+        </div>
+      </div>
+    </article>`;
+}
+
+function addRecruitYear() {
+  ensureRecruitCalendars();
+  const items = appState.state.recruitCalendars;
+  const years = items.map((item) => Number(recruitYear(item.year))).filter((year) => year > 0);
+  items.push({
+    year: String(years.length ? Math.max.apply(null, years) + 1 : new Date().getFullYear()),
+    mediaFolderId: '',
+    mediaFileIds: [],
+    published: !items.length
+  });
+  commitEditorChange('recruit');
+}
+
+function publishRecruitYear(index) {
+  appState.state.recruitCalendars.forEach((item, i) => { item.published = i === index; });
+  commitEditorChange('recruit');
+}
+
+function removeRecruitYear(index) {
+  if (!confirm('この年度を削除しますか？')) return;
+  const items = appState.state.recruitCalendars;
+  items.splice(index, 1);
+  if (items.length && !items.some((item) => item.published !== false)) items[0].published = true;
+  commitEditorChange('recruit');
+}
+
+/* ---------- 活動記録・告知 ---------- */
+function renderActivitiesEditor() {
+  renderEditorPanel('activity', 'panel-activities', '活動記録・告知',
+    '公開日が新しい順に表示されます。必要に応じて非公開にできます。',
+    html`<button class="button" type="button" onclick="addActivityArticle()">記事を追加</button>`,
+    editorItems('activity'), renderActivityEditorItem);
+}
+
+const ACTIVITY_CATEGORIES = [['record', '活動記録'], ['event', 'イベント告知'], ['other', 'その他']];
+
+function renderActivityEditorItem(item, index) {
+  const published = item.published !== false;
+  const category = String(item.category || 'record');
+  return html`
+    <article class="editor-item" data-editor="activity" data-index="${index}">
+      <div class="editor-item-head">
+        <div>
+          <div class="item-title" data-live-title>${editorItemTitle('activity', item)}</div>
+          <div class="editor-item-meta">${visibleChipHtml(published)}<span>初回公開日: ${formatDate(item.createdAt)}</span></div>
+        </div>
+        <div class="item-actions">
+          ${renderPublishToggle('activity', index, published)}
+          ${renderRemoveButton(`removeItem('activity', ${index})`)}
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field full">
+          <label>記事タイトル</label>
+          <input data-field="title" value="${item.title}" oninput="onEditorInput(this)">
+        </div>
+        <div class="field">
+          <label>カテゴリ</label>
+          <select data-field="category" oninput="onEditorInput(this)">
+            ${ACTIVITY_CATEGORIES.map(([value, label]) => html`<option value="${value}"${category === value && html` selected`}>${label}</option>`)}
+          </select>
+        </div>
+        <div class="field full">
+          <label>本文</label>
+          <textarea data-field="body" oninput="onEditorInput(this)">${item.body}</textarea>
+        </div>
+        <div class="field full">
+          <label>画像</label>
+          ${renderMediaButton('activity', index, '画像の設定')}
+        </div>
+      </div>
+    </article>`;
+}
+
+function addActivityArticle() {
+  editorItems('activity').unshift({
+    articleId: '',
+    title: '',
+    body: '',
+    category: 'record',
+    mediaFolderId: '',
+    mediaFileIds: [],
+    published: true,
+    createdAt: new Date(Date.now() + 3600 * 1000).toISOString()
+  });
+  commitEditorChange('activity');
+}
+
+/* ---------- 記事・展示会・事例に共通の操作（新歓は「公開する年度を1つ選ぶ」なので別） ---------- */
+function toggleItemPublished(kind, index) {
+  const item = editorItems(kind)[index];
+  if (!item) return;
+  item.published = item.published === false;
+  commitEditorChange(kind);
+}
+
+function removeItem(kind, index) {
+  const list = EDITOR_LISTS[kind];
+  if (!confirm('この' + list.noun + 'を削除しますか？\n公開済みのコンテンツは削除ではなく非公開推奨です。')) return;
+  editorItems(kind).splice(index, 1);
+  commitEditorChange(kind);
+}
+
+/* ---------- 展示会 ---------- */
+function renderExhibitionsEditor() {
+  appState.state.exhibitions = sortExhibitions(editorItems('exhibition'));
+  renderEditorPanel('exhibition', 'panel-exhibitions', '展示会',
+    '開始日をもとに自動で並びます。開催予定は複数設定でき、近い順に表示されます。直近の展示はアーカイブの最新1件から自動で反映されます。',
+    html`<button class="button" type="button" onclick="addExhibition()">展示会を追加</button>`,
+    appState.state.exhibitions, renderExhibitionEditorItem);
+}
+
+function renderExhibitionEditorItem(item, index) {
+  const published = item.published !== false;
+  const upcoming = item.displayBucket === 'upcoming';
+  const textField = (field, placeholder) => html`
+    <input data-field="${field}" value="${item[field]}"${placeholder && html` placeholder="${placeholder}"`} oninput="onEditorInput(this)">`;
+  return html`
+    <article class="editor-item" data-editor="exhibition" data-index="${index}">
+      <div class="editor-item-head">
+        <div>
+          <div class="item-title" data-live-title>${editorItemTitle('exhibition', item)}</div>
+          <div class="editor-item-meta">${visibleChipHtml(published)}<span>${upcoming ? '開催予定' : 'アーカイブ'}</span></div>
+        </div>
+        <div class="item-actions">
+          <button class="button subtle" type="button" onclick="toggleExhibitionBucket(${index})">${upcoming ? 'アーカイブへ' : '開催予定へ'}</button>
+          ${renderPublishToggle('exhibition', index, published)}
+          ${renderRemoveButton(`removeItem('exhibition', ${index})`)}
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field full">
+          <label>展示会名</label>
+          ${textField('title')}
+        </div>
+        <div class="field full">
+          <label>サブタイトル（任意）</label>
+          ${textField('subtitle', '例: 第〇回 凌美会展')}
+        </div>
+        <div class="field full">
+          <label>概要</label>
+          <textarea data-field="theme" oninput="onEditorInput(this)">${item.theme}</textarea>
+        </div>
+        <div class="field">
+          <label>開始日</label>
+          <input data-field="startDate" type="date" value="${item.startDate}" onchange="onExhibitionDateChange(this)">
+        </div>
+        <div class="field">
+          <label>終了日（1日だけなら空欄）</label>
+          <input data-field="endDate" type="date" value="${item.endDate}" onchange="onExhibitionDateChange(this)">
+        </div>
+        <div class="field full">
+          <label>会期表示</label>
+          ${renderDateLineField(item)}
+        </div>
+        <div class="field full">
+          <label>時間帯表示</label>
+          ${textField('timeLine', '例: 11:00 - 19:00 / 初日 14:00から / 最終日 17:00まで')}
+        </div>
+        <div class="field">
+          <label>会場名</label>
+          ${textField('venueName')}
+        </div>
+        <div class="field">
+          <label>会場住所</label>
+          ${textField('venueAddress')}
+        </div>
+        <div class="field full">
+          <label>画像・作品情報</label>
+          ${renderMediaButton('exhibition', index, '画像・作品情報の設定')}
+        </div>
+      </div>
+    </article>`;
+}
+
+function addExhibition() {
+  editorItems('exhibition').unshift({
+    exhibitionId: '',
+    displayBucket: 'upcoming',
+    startDate: '',
+    endDate: '',
+    title: '',
+    subtitle: '',
+    theme: '',
+    venueName: '',
+    venueAddress: '',
+    dateLine: '',
+    timeLine: '',
+    mediaFolderId: '',
+    dmFileIds: [],
+    works: [],
+    published: true,
+    draftCreatedAt: new Date(Date.now() + 3600 * 1000).toISOString()
+  });
+  commitEditorChange('exhibition');
+}
+
+function toggleExhibitionBucket(index) {
+  const item = editorItems('exhibition')[index];
+  if (!item) return;
+  item.displayBucket = item.displayBucket === 'upcoming' ? 'archive' : 'upcoming';
+  commitEditorChange('exhibition');
+}
+
+/* 会期表示には3つの状態がある。
+   ① 自動：日付から作った表示を読み取り専用で見せる（ペンで編集）
+   ② 編集中（data-editing）：入力欄として直せる（「完了」か Enter で確定、Esc で取り消し）
+   ③ 手入力（data-manual）：直した表示を読み取り専用で見せる（ペンで再編集、↺ で自動に戻す）
+   日付を変えたら、どの状態でも日付から作り直して ① に戻す。
+   内容の dateLine は、空なら「日付から作った表示」を意味する（保存するときに作る） */
+function exhibitionDateLineAuto(item) {
+  return formatExhibitionDateLine(item.startDate, item.endDate);
+}
+
+function renderDateLineField(item) {
+  const auto = exhibitionDateLineAuto(item);
+  const manual = !!item.dateLine && item.dateLine !== auto;
+  return html`
+    <div class="date-line-field" data-date-line${manual && html` data-manual`}>
+      <input data-field="dateLine" value="${manual ? item.dateLine : auto}" placeholder="開始日を選ぶと自動で表示されます" aria-label="会期表示" readonly oninput="onEditorInput(this)" onkeydown="onDateLineKeydown(event)">
+      <button class="icon-action-button date-line-edit" type="button" onclick="editExhibitionDateLine(this)" aria-label="会期表示を編集" title="会期表示を編集"><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+      <button class="button success date-line-done" type="button" onclick="finishExhibitionDateLine(this)">完了</button>
+      <button class="icon-action-button date-line-reset" type="button" onclick="resetExhibitionDateLine(this)" aria-label="日付からの自動表示に戻す" title="日付からの自動表示に戻す"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i></button>
+    </div>`;
+}
+
+/* editing: 入力欄として直せる状態か。manual: 確定した表示が日付からの自動表示と違うか */
+function setDateLineState(box, editing, manual) {
+  box.toggleAttribute('data-editing', editing);
+  box.toggleAttribute('data-manual', manual);
+  box.querySelector('[data-field="dateLine"]').readOnly = !editing;
+}
+
+/* 会期表示を変えて、入力欄・状態・プレビューを合わせる */
+function setExhibitionDateLine(box, text, editing, manual) {
+  const input = box.querySelector('[data-field="dateLine"]');
+  input.value = text;
+  editorItemOf(box).dateLine = text;
+  setDateLineState(box, editing, manual);
+  refreshPreview('exhibition');
+}
+
+function editExhibitionDateLine(button) {
+  const box = button.closest('[data-date-line]');
+  const input = box.querySelector('[data-field="dateLine"]');
+  box.setAttribute('data-previous', input.value);
+  setDateLineState(box, true, box.hasAttribute('data-manual'));
+  input.focus();
+  input.select();
+}
+
+/* 空欄で確定したら自動の表示に戻す（会期が空のまま公開されないように） */
+function finishExhibitionDateLine(button) {
+  const box = button.closest('[data-date-line]');
+  const auto = exhibitionDateLineAuto(editorItemOf(box));
+  const text = box.querySelector('[data-field="dateLine"]').value.trim() || auto;
+  setExhibitionDateLine(box, text, false, text !== auto);
+  markDirty();
+}
+
+function cancelExhibitionDateLine(box) {
+  setExhibitionDateLine(box, box.getAttribute('data-previous') || '', false, box.hasAttribute('data-manual'));
+}
+
+function onDateLineKeydown(event) {
+  const box = event.target.closest('[data-date-line]');
+  if (!box || !box.hasAttribute('data-editing')) return;
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    finishExhibitionDateLine(event.target);
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    cancelExhibitionDateLine(box);
+  }
+}
+
+function resetExhibitionDateLine(button) {
+  const box = button.closest('[data-date-line]');
+  setExhibitionDateLine(box, exhibitionDateLineAuto(editorItemOf(box)), false, false);
+  markDirty();
+}
+
+/* 日付は並び順も変えるので、確定したとき（change）に入れて一覧を描き直す */
+function onExhibitionDateChange(input) {
+  const item = editorItemOf(input);
+  const box = input.closest('[data-editor]').querySelector('[data-date-line]');
+  if (box.hasAttribute('data-manual') || box.hasAttribute('data-editing')) setStatus('日付を変更したため、会期表示を日付から作り直しました。');
+  item[input.getAttribute('data-field')] = input.value;
+  item.dateLine = '';
+  commitEditorChange('exhibition');
+}
+
+/* ---------- ご依頼（取り組み事例） ---------- */
+function renderRequestsEditor() {
+  renderEditorPanel('request', 'panel-requests', 'ご依頼の方',
+    '新しく追加した事例は先頭に配置されます。',
+    html`<button class="button" type="button" onclick="addRequestCase()">取り組み事例を追加</button>`,
+    editorItems('request'), renderRequestEditorItem);
+}
+
+function renderRequestEditorItem(item, index) {
+  const published = item.published !== false;
+  return html`
+    <article class="editor-item" data-editor="request" data-index="${index}">
+      <div class="editor-item-head">
+        <div>
+          <div class="item-title" data-live-title>${editorItemTitle('request', item)}</div>
+          <div class="editor-item-meta">${visibleChipHtml(published)}<span>表示順 ${index + 1}</span></div>
+        </div>
+        <div class="item-actions">
+          <button class="button" type="button" onclick="moveRequestCase(${index}, -1)">↑</button>
+          <button class="button" type="button" onclick="moveRequestCase(${index}, 1)">↓</button>
+          ${renderPublishToggle('request', index, published)}
+          ${renderRemoveButton(`removeItem('request', ${index})`)}
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field full">
+          <label>取り組みタイトル</label>
+          <input data-field="title" value="${item.title}" oninput="onEditorInput(this)">
+        </div>
+        <div class="field full">
+          <label>本文</label>
+          <textarea data-field="body" oninput="onEditorInput(this)">${item.body}</textarea>
+        </div>
+        <div class="field full">
+          <label>画像</label>
+          ${renderMediaButton('request', index, '画像の設定')}
+        </div>
+      </div>
+    </article>`;
+}
+
+function addRequestCase() {
+  editorItems('request').unshift({
+    caseId: '',
+    title: '',
+    body: '',
+    mediaFolderId: '',
+    mediaFileIds: [],
+    published: true
+  });
+  commitEditorChange('request');
+}
+
+function moveRequestCase(index, delta) {
+  const moved = movedInList(editorItems('request'), index, delta);
+  if (!moved) return;
+  appState.state.requestCases = moved;
+  commitEditorChange('request');
+}
+
+/* ---------- 更新履歴メモ ---------- */
+function renderLogs() {
+  document.getElementById('panel-logs').innerHTML = html`
+    <div class="stack">
+      <div class="card">
+        <div data-help>
+          <div class="help-title"><h2>更新履歴メモ</h2>${HELP_BUTTON}</div>
+          <p class="panel-lead help-text">必要なときだけ、自由記述の履歴を追加できます。サイト側の履歴には現在の公開状態に応じて表示されます。</p>
+        </div>
+        <div class="field full" data-editor="logs">
+          <label>フリーテキスト履歴（改行ごとに1項目）</label>
+          <textarea id="manualChangeNote" data-field="manualChangeNote" placeholder="例: 会場のご案内を更新しました。&#10;次回展示の詳細を追記しました。" oninput="onEditorInput(this)">${appState.state.manualChangeNote}</textarea>
+        </div>
+      </div>
+      <div id="logsPreviewContent"></div>
+    </div>`;
+  renderLogsPreviewContent();
+}
+
+/* ---------- 保存・公開・プレビューに渡す内容 ----------
+   入力途中の値を、保存する形にそろえる（文章の前後の空白を取る・年度は数字だけ・決まった順に並べる） */
+function trimmedText(value) {
+  return String(value || '').trim();
+}
+
+function recruitPayload(item) {
+  return {
+    year: recruitYear(item.year),
+    mediaFolderId: item.mediaFolderId || '',
+    mediaFileIds: normalizeIdList(item.mediaFileIds),
+    published: item.published !== false
+  };
+}
+
+function activityPayload(item) {
+  return {
+    articleId: item.articleId || '',
+    title: trimmedText(item.title),
+    body: trimmedText(item.body),
+    category: item.category || 'record',
+    mediaFolderId: item.mediaFolderId || '',
+    mediaFileIds: normalizeIdList(item.mediaFileIds),
+    published: item.published !== false,
+    createdAt: item.createdAt || new Date().toISOString()
+  };
+}
+
+function exhibitionPayload(item) {
+  return {
+    exhibitionId: item.exhibitionId || '',
+    displayBucket: item.displayBucket || 'archive',
+    startDate: item.startDate || '',
+    endDate: item.endDate || '',
+    title: trimmedText(item.title),
+    subtitle: trimmedText(item.subtitle),
+    theme: trimmedText(item.theme),
+    venueName: trimmedText(item.venueName),
+    venueAddress: trimmedText(item.venueAddress),
+    dateLine: trimmedText(item.dateLine || exhibitionDateLineAuto(item)),
+    timeLine: trimmedText(item.timeLine),
+    mediaFolderId: item.mediaFolderId || '',
+    dmFileIds: normalizeIdList(item.dmFileIds),
+    published: item.published !== false,
+    draftCreatedAt: item.draftCreatedAt || '',
+    works: (item.works || []).map((work) => ({ ...work, title: trimmedText(work.title), artist: trimmedText(work.artist) }))
+  };
+}
+
+function requestPayload(item) {
+  return {
+    caseId: item.caseId || '',
+    title: trimmedText(item.title),
+    body: trimmedText(item.body),
+    mediaFolderId: item.mediaFolderId || '',
+    mediaFileIds: normalizeIdList(item.mediaFileIds),
+    published: item.published !== false
+  };
+}
+
+function buildPayloadList(kind) {
+  const list = EDITOR_LISTS[kind];
+  const items = editorItems(kind).map(list.toPayload);
+  return list.sort ? list.sort(items) : items;
+}
+
+function buildPayload() {
+  return {
+    recruitCalendars: buildPayloadList('recruit'),
+    activityArticles: buildPayloadList('activity'),
+    exhibitions: buildPayloadList('exhibition'),
+    requestCases: buildPayloadList('request'),
+    manualChangeNote: trimmedText(appState.state.manualChangeNote)
+  };
+}
+</script>

@@ -20,7 +20,7 @@ SCOPES = [
     'https://www.googleapis.com/auth/drive.readonly',
     'https://www.googleapis.com/auth/spreadsheets.readonly',
 ]
-# 管理画面は、公開した内容全体を _PublishedState に JSON で書く（形は homepage-cms の README「8-4」）
+# 管理画面は、公開した内容全体を _PublishedState に JSON で書く（形は README「8-4」）
 PUBLISHED_STATE_RANGE = "'_PublishedState'"
 CHANGE_LOG_RANGE = 'ChangeLog!A1:Z2000'
 CONTENT_FORMAT_VERSION = 2
@@ -161,7 +161,7 @@ def get_sheet_rows(sheets, spreadsheet_id: str, range_name: str) -> list[dict[st
 def read_published_content(sheets, spreadsheet_id: str) -> dict[str, Any]:
     """_PublishedState の内容。まだ公開していなければ空の内容。
 
-    長い内容は管理画面がセルを分けて書く（homepage-cms の ContentStore.js の buildPayloadCells_）。
+    長い内容は管理画面がセルを分けて書く（cms/ContentStore.js の buildPayloadCells_）。
     payload_json に {"storage_format": "chunked-json-v1", "chunk_count": n} を書き、
     payload_json_2 から n 個の列に、JSON の文字列として分けた中身を置く。
     読めないとき・版が違うときは止める。空のサイトや崩れたサイトを公開しないため。"""

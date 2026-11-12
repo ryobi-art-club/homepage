@@ -1,5 +1,5 @@
 """ページの部品ごとの HTML（更新履歴・展示会・活動記録・ご依頼・入部案内・ヒーロー）。
-管理画面のプレビュー（homepage-cms の UiPreview.html）が同じ部品をまねているので、見た目を変えたら両方を直す（README「管理画面のプレビュー」）。"""
+管理画面のプレビュー（cms/UiPreview.html）が同じ部品をまねているので、見た目を変えたら両方を直す（対応する関数は README「12-6」）。"""
 from __future__ import annotations
 
 import re
@@ -99,7 +99,7 @@ def render_work_gallery(works: list[dict[str, Any]], gallery_id: str) -> Markup 
 
 # ---------- 更新履歴 ----------
 
-# 更新履歴の文言。管理画面（ContentHistory.js の CHANGE_LOG_ITEM_LISTS）と同じにする（homepage-cms の README「8-4」）
+# 更新履歴の文言。管理画面（cms/ContentHistory.js の CHANGE_LOG_ITEM_LISTS）と同じにする（README「8-4」）
 CHANGE_LOG_RECRUIT_TEXT = '新歓イベントカレンダーを更新'
 CHANGE_LOG_TEXT = {
     'activity': '活動記録・告知「{}」',
