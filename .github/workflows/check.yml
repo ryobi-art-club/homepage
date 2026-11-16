@@ -1,6 +1,6 @@
 name: Check
 
-# プッシュのたびにテストを動かす（サイトのビルドは公開のときだけ動くので、その前に気づけるように）。
+# プッシュのたびに、サイトと管理画面（cms/）のテストを動かす（サイトのビルドは公開のときだけ動くので、その前に気づけるように）。
 # 公開してはいけないものを入れてしまったときも、ここで失敗のメールが届く
 on:
   push:
@@ -27,3 +27,19 @@ jobs:
 
       - name: Run tests
         run: python -m unittest discover tests
+
+  cms:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false # テストはライブラリを使わない
+
+      - name: Run CMS tests
+        working-directory: cms
+        run: node --test tests/*.cjs

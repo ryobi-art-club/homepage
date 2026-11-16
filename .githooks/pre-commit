@@ -1,7 +1,8 @@
 #!/bin/sh
 # コミットの前に、公開してはいけないもの（メールアドレス・管理画面の URL・鍵・Excel など）が入っていないかを確かめる。
 # 使うには、クローンしたあとに1回だけ：git config core.hooksPath .githooks
-python tests/test_repository_contents.py || python3 tests/test_repository_contents.py || {
+PYTHON=$(command -v python || command -v python3)
+"$PYTHON" tests/test_repository_contents.py || {
   echo '公開してはいけないものが入っているため、コミットを止めました（上の一覧を見て、外してからコミットしてください）。' >&2
   exit 1
 }

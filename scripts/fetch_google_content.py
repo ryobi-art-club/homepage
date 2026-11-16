@@ -14,15 +14,17 @@ from typing import Any
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload
 
 SCOPES = [
     'https://www.googleapis.com/auth/drive.readonly',
     'https://www.googleapis.com/auth/spreadsheets.readonly',
 ]
-# 管理画面は、公開した内容全体を _PublishedState に JSON で書く（形は homepage-cms の README「8-4」）
+# 管理画面は、公開した内容全体を _PublishedState に JSON で書く（形は docs/reference/data.md）
 PUBLISHED_STATE_RANGE = "'_PublishedState'"
-CHANGE_LOG_RANGE = 'ChangeLog!A1:Z2000'
+# 範囲を区切らない（行が増えても、新しい履歴から読まれなくなることがないように）
+CHANGE_LOG_RANGE = "'ChangeLog'"
 CONTENT_FORMAT_VERSION = 2
 IMAGES_PER_ITEM = 10
 WORKS_PER_EXHIBITION = 200
@@ -58,6 +60,8 @@ class DriveFiles:
         self.copies: list[tuple[str, Path]] = []
         self.pool = ThreadPoolExecutor(max_workers=DOWNLOAD_WORKERS)
         self.downloaded = 0
+        # Drive にもうない（削除された）画像。サイトには載せず、数だけログに出す
+        self.missing: set[str] = set()
         self.lock = threading.Lock()
         if cache_dir:
             cache_dir.mkdir(parents=True, exist_ok=True)
@@ -68,22 +72,42 @@ class DriveFiles:
             self.local.drive = build('drive', 'v3', credentials=self.credentials, cache_discovery=False)
         return self.local.drive
 
+    # 情報が取れないとき：Drive にもうない（404）なら、その画像を飛ばす。それ以外（共有が外れた・一時的な不調など）は
+    # ビルドを止める。黙って飛ばすと、画像がサイトとキャッシュから消えるため（サイトは前の状態のまま残る）
+    def remember_meta(self, file_id: str, response: dict[str, Any] | None, error: Exception | None) -> None:
+        if error is None:
+            self.meta_by_id[file_id] = response
+        elif isinstance(error, HttpError) and error.resp.status == 404:
+            self.meta_by_id[file_id] = None
+            self.missing.add(file_id)
+        else:
+            raise RuntimeError(f'Drive の画像の情報を読めませんでした（{file_id}）: {error}') from error
+
     def prefetch_meta(self, file_ids: list[str]) -> None:
         ids = [file_id for file_id in dict.fromkeys(file_ids) if file_id not in self.meta_by_id]
         for start in range(0, len(ids), BATCH_SIZE):
+            errors = []
+
             def remember(request_id, response, exception):
-                self.meta_by_id[request_id] = None if exception else response
+                try:
+                    self.remember_meta(request_id, response, exception)
+                except RuntimeError as error:
+                    errors.append(error)
             batch = self.service().new_batch_http_request(callback=remember)
             for file_id in ids[start:start + BATCH_SIZE]:
                 batch.add(self.service().files().get(fileId=file_id, fields=FILE_FIELDS, supportsAllDrives=True), request_id=file_id)
             batch.execute()
+            if errors:
+                raise errors[0]
 
     def meta(self, file_id: str) -> dict[str, Any] | None:
         if file_id not in self.meta_by_id:
             try:
-                self.meta_by_id[file_id] = self.service().files().get(fileId=file_id, fields=FILE_FIELDS, supportsAllDrives=True).execute()
-            except Exception:
-                self.meta_by_id[file_id] = None
+                response = self.service().files().get(fileId=file_id, fields=FILE_FIELDS, supportsAllDrives=True).execute()
+            except Exception as error:
+                self.remember_meta(file_id, None, error)
+            else:
+                self.remember_meta(file_id, response, None)
         return self.meta_by_id[file_id]
 
     # 取得を始めてすぐ戻る。finish がすべての取得を待ち、指定の場所に写す
@@ -142,11 +166,15 @@ class DriveFiles:
         return removed
 
 
-def get_sheet_rows(sheets, spreadsheet_id: str, range_name: str) -> list[dict[str, str]]:
+# 読めないときは止める（空のサイトを公開しないため。サイトは前の状態のまま残る）。
+# missing_ok なら、シートがまだないときだけ空にする（管理画面が最初に書いたときに作られるシート）
+def get_sheet_rows(sheets, spreadsheet_id: str, range_name: str, missing_ok: bool = False) -> list[dict[str, str]]:
     try:
         values = sheets.spreadsheets().values().get(spreadsheetId=spreadsheet_id, range=range_name).execute().get('values', [])
-    except Exception:
-        return []
+    except Exception as error:
+        if missing_ok and 'Unable to parse range' in str(error):
+            return []
+        raise
     if not values:
         return []
     headers = values[0]
@@ -159,12 +187,12 @@ def get_sheet_rows(sheets, spreadsheet_id: str, range_name: str) -> list[dict[st
 
 
 def read_published_content(sheets, spreadsheet_id: str) -> dict[str, Any]:
-    """_PublishedState の内容。まだ公開していなければ空の内容。
+    """_PublishedState の内容。シートはあるが中身がなければ（公開したことがなければ）空の内容。
 
-    長い内容は管理画面がセルを分けて書く（homepage-cms の ContentStore.js の buildPayloadCells_）。
+    長い内容は管理画面がセルを分けて書く（cms/ContentStore.js の buildPayloadCells_）。
     payload_json に {"storage_format": "chunked-json-v1", "chunk_count": n} を書き、
     payload_json_2 から n 個の列に、JSON の文字列として分けた中身を置く。
-    読めないとき・版が違うときは止める。空のサイトや崩れたサイトを公開しないため。"""
+    シートがないとき・読めないとき・版が違うときは止める。空のサイトや崩れたサイトを公開しないため。"""
     rows = get_sheet_rows(sheets, spreadsheet_id, PUBLISHED_STATE_RANGE)
     if not rows or not rows[0].get('payload_json'):
         return {}
@@ -184,8 +212,9 @@ def published_items(items: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     return [item for item in items or [] if item.get('published', True) and item.get('title')]
 
 
+# 公開中の年度がなければ、何も載せない（非公開の年度を出さない）
 def published_recruit_calendar(calendars: list[dict[str, Any]]) -> dict[str, Any]:
-    return next((item for item in calendars if item.get('published') is True), calendars[0] if calendars else {})
+    return next((item for item in calendars if item.get('published') is True), {})
 
 
 # サイトに載せる画像のファイル ID。ファイルの情報をまとめて問い合わせるために集める
@@ -258,7 +287,7 @@ def normalize_recruit_calendar(calendars: list[dict[str, Any]], drive, assets_ro
 def normalize_activity_articles(articles: list[dict[str, Any]], drive, assets_root: Path) -> list[dict[str, Any]]:
     items = []
     for article in published_items(articles):
-        article_id = article.get('articleId') or safe_slug(article['title'])
+        article_id = article['articleId']
         items.append({
             'id': article_id,
             'title': article['title'],
@@ -274,7 +303,7 @@ def normalize_activity_articles(articles: list[dict[str, Any]], drive, assets_ro
 def normalize_requests(cases: list[dict[str, Any]], drive, assets_root: Path) -> list[dict[str, Any]]:
     items = []
     for case in published_items(cases):
-        case_id = case.get('caseId') or safe_slug(case['title'])
+        case_id = case['caseId']
         items.append({
             'id': case_id,
             'title': case['title'],
@@ -288,7 +317,7 @@ def normalize_exhibitions(exhibitions: list[dict[str, Any]], drive, assets_root:
     upcoming = []
     archive = []
     for exhibition in published_items(exhibitions):
-        ex_id = exhibition.get('exhibitionId') or safe_slug(exhibition['title'])
+        ex_id = exhibition['exhibitionId']
         folder = assets_root / 'exhibitions' / ex_id
 
         dm_images = []
@@ -321,7 +350,6 @@ def normalize_exhibitions(exhibitions: list[dict[str, Any]], drive, assets_root:
             'time_line': exhibition.get('timeLine', ''),
             'folder_id': folder_id,
             'folder_url': f'https://drive.google.com/drive/folders/{folder_id}' if folder_id else '',
-            'dm_image': dm_images[0] if dm_images else '',
             'dm_images': dm_images,
             'works': works,
             'start_date': exhibition.get('startDate', ''),
@@ -358,11 +386,12 @@ def main() -> None:
         'activities': normalize_activity_articles(content.get('activityArticles'), drive, assets_dir),
         'requests': normalize_requests(content.get('requestCases'), drive, assets_dir),
         'exhibitions': normalize_exhibitions(content.get('exhibitions'), drive, assets_dir),
-        'change_log': normalize_change_log(get_sheet_rows(sheets, args.content_spreadsheet_id, CHANGE_LOG_RANGE)),
+        'change_log': normalize_change_log(get_sheet_rows(sheets, args.content_spreadsheet_id, CHANGE_LOG_RANGE, missing_ok=True)),
     }
     drive.finish()
     removed = drive.prune_cache()
-    print(f'Images: {len(drive.cache_jobs)} used, {drive.downloaded} downloaded, {len(drive.cache_jobs) - drive.downloaded} from cache, {removed} removed from cache')
+    print(f'Images: {len(drive.cache_jobs)} used, {drive.downloaded} downloaded, {len(drive.cache_jobs) - drive.downloaded} from cache, '
+          f'{removed} removed from cache, {len(drive.missing)} no longer in Drive')
     output_json.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding='utf-8')
     print(f'Wrote snapshot to {output_json}')
 

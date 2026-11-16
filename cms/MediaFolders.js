@@ -1,0 +1,225 @@
+// 項目ごとのフォルダ：作る・名前・共有・一時置き場と退避先、Drive の操作のやり直し
+
+function ensureManagedFolder_(kind, folderId, title, draft) {
+  const existingId = String(folderId || '').trim();
+  if (existingId) {
+    const folder = getDriveFolderWithRetry_(existingId, '画像フォルダ取得');
+    return folder;
+  }
+
+  const root = getDriveFolderWithRetry_(rootFolderIdForKind_(kind), '画像親フォルダ取得');
+  const folderName = buildManagedFolderName_(title, draft !== false);
+  const folder = retryDriveOperation_(() => root.createFolder(folderName), '画像フォルダ作成');
+  return folder;
+}
+
+function buildManagedFolderName_(title, draft, existingName) {
+  const base = sanitizeFolderTitle_(title || '素材');
+  const tz = Session.getScriptTimeZone() || 'Asia/Tokyo';
+  if (draft) {
+    return base + '_下書き_' + Utilities.formatDate(new Date(), tz, 'yyyyMMdd_HHmm');
+  }
+  const existingDate = String(existingName || '').match(/_(\d{8})(?:$|[^0-9])/);
+  const datePart = existingDate ? existingDate[1] : Utilities.formatDate(new Date(), tz, 'yyyyMMdd');
+  return base + '_' + datePart;
+}
+
+// Drive の名前に使えない文字と制御文字を除き、空白を1つにまとめる
+function cleanDriveName_(text) {
+  return String(text || '').trim()
+    .replace(/[\\/:*?"<>|#%{}~&]/g, '-')
+    .replace(/[\u0000-\u001f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+// フォルダ名の「_」は日付との区切りに使うので、タイトルの中の「_」は「-」にする
+function sanitizeFolderTitle_(title) {
+  return cleanDriveName_(String(title || '').replace(/_/g, '-')).slice(0, 80).trim() || '素材';
+}
+
+function renameFolderIfPresent_(folderId, title, draft) {
+  const value = String(folderId || '').trim();
+  if (!value) return null;
+  const folder = getDriveFolderWithRetry_(value, '画像フォルダ取得');
+  const currentName = retryDriveOperation_(() => folder.getName(), '画像フォルダ名取得');
+  const nextName = buildManagedFolderName_(title, !!draft, currentName);
+  if (currentName !== nextName) {
+    retryDriveOperation_(() => folder.setName(nextName), '画像フォルダ名変更');
+  }
+  return folder;
+}
+
+function rootFolderIdForKind_(kind) {
+  const config = getConfig_();
+  const map = {
+    recruit: config.ROOT_RECRUIT_FOLDER_ID,
+    activity: config.ROOT_ACTIVITY_FOLDER_ID,
+    exhibition: config.ROOT_EXHIBITION_FOLDER_ID,
+    request: config.ROOT_REQUEST_FOLDER_ID
+  };
+  return map[requireOneOf_(kind, Object.keys(MEDIA_KIND_LABELS), '画像種別が不正です。')];
+}
+
+// 項目のフォルダ（4つのルートフォルダの直下で、CMS_ の一時置き場・退避先ではないもの）なら、そのルートの ID。
+// それ以外は ''
+function managedItemRootId_(folder) {
+  const name = retryDriveOperation_(() => folder.getName(), '画像フォルダ名取得');
+  if (/^CMS_(下書き|未登録)_/.test(name)) return '';
+  const config = getConfig_();
+  const roots = [config.ROOT_RECRUIT_FOLDER_ID, config.ROOT_ACTIVITY_FOLDER_ID, config.ROOT_EXHIBITION_FOLDER_ID, config.ROOT_REQUEST_FOLDER_ID];
+  const parents = retryDriveOperation_(() => folder.getParents(), '画像フォルダの親取得');
+  while (parents.hasNext()) {
+    const parentId = parents.next().getId();
+    if (roots.indexOf(parentId) !== -1) return parentId;
+  }
+  return '';
+}
+
+function isManagedItemFolder_(folder) {
+  return !!managedItemRootId_(folder);
+}
+
+function requireManagedItemFolder_(folder) {
+  if (folder.isTrashed() || !isManagedItemFolder_(folder)) {
+    throw new Error('画像のフォルダが見つかりません。最新のデータを読み込んでください。');
+  }
+}
+
+// 一時置き場（staging：CMS_下書き_<項目のフォルダの ID>）と退避先（recovery：CMS_未登録_<項目のフォルダの ID>）。項目のフォルダと同じルートの中にある
+function getMediaAuxFolder_(folderId, type, create, rootId) {
+  const parentId = rootId || managedItemRootId_(getDriveFolderWithRetry_(folderId, '画像フォルダ取得'));
+  if (!parentId) throw new Error('画像のフォルダが見つかりません。最新のデータを読み込んでください。');
+  const root = getDriveFolderWithRetry_(parentId, '画像親フォルダ取得');
+  const name = 'CMS_' + (type === 'staging' ? '下書き' : '未登録') + '_' + folderId;
+  const folders = retryDriveOperation_(() => root.getFoldersByName(name), '補助フォルダ取得');
+  const folder = folders.hasNext() ? folders.next() : null;
+  if (!create) return folder;
+  if (root.getSharingAccess() !== DriveApp.Access.PRIVATE) {
+    throw new Error('下書き画像を非公開で保管するため、画像の親フォルダ（新歓・活動記録・展示会・ご依頼）の共有設定を「制限付き」にしてください。');
+  }
+  const result = folder || root.createFolder(name);
+  setFolderLinkSharing_(result, false);
+  return result;
+}
+
+// 項目のフォルダと、その一時置き場・退避先（同じルートフォルダの中にある）
+function mediaSourceFolders_(folder) {
+  const sources = [folder];
+  const rootId = managedItemRootId_(folder);
+  if (rootId) {
+    const folderId = retryDriveOperation_(() => folder.getId(), '画像フォルダID取得');
+    ['staging', 'recovery'].forEach((type) => {
+      const auxiliary = getMediaAuxFolder_(folderId, type, false, rootId);
+      if (auxiliary) sources.push(auxiliary);
+    });
+  }
+  return sources;
+}
+
+function listFolderFiles_(folder) {
+  const iterator = retryDriveOperation_(() => folder.getFiles(), 'Drive画像一覧取得');
+  const files = [];
+  while (iterator.hasNext()) files.push(iterator.next());
+  return files;
+}
+
+function isLinkShared_(target) {
+  const access = retryDriveOperation_(() => target.getSharingAccess(), '共有設定取得');
+  return access === DriveApp.Access.ANYONE_WITH_LINK || access === DriveApp.Access.ANYONE;
+}
+
+function setFolderLinkSharing_(folder, isPublic) {
+  if (isLinkShared_(folder) === isPublic) return;
+  retryDriveOperation_(
+    () => isPublic
+      ? folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW)
+      : folder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE),
+    'フォルダの共有設定'
+  );
+}
+
+function trashFolderIfEmpty_(folderId) {
+  const folder = getDriveFolderWithRetry_(folderId, '画像フォルダ取得');
+  const files = retryDriveOperation_(() => folder.getFiles(), '画像フォルダ空チェック');
+  if (files.hasNext()) return false;
+  if (folder.getFolders().hasNext()) return false;
+  retryDriveOperation_(() => folder.setTrashed(true), '空フォルダ削除');
+  return true;
+}
+
+function uniqueFileName_(folder, name, ignoreFileId) {
+  const safe = safeFileName_(name);
+  const names = getExistingFileNameSet_(folder, ignoreFileId);
+  if (!names[safe.toLowerCase()]) return safe;
+
+  const dot = safe.lastIndexOf('.');
+  const base = dot > 0 ? safe.slice(0, dot) : safe;
+  const ext = dot > 0 ? safe.slice(dot) : '';
+  for (let i = 2; i < 1000; i += 1) {
+    const candidate = base + '-' + i + ext;
+    if (!names[candidate.toLowerCase()]) return candidate;
+  }
+  throw new Error('同名ファイルが多すぎます。別の名前にしてください。');
+}
+
+function getExistingFileNameSet_(folder, ignoreFileId) {
+  const names = {};
+  const iterator = retryDriveOperation_(() => folder.getFiles(), '既存ファイル一覧取得');
+  while (iterator.hasNext()) {
+    const file = iterator.next();
+    const id = retryDriveOperation_(() => file.getId(), '既存ファイルID取得');
+    if (ignoreFileId && id === ignoreFileId) continue;
+    const name = retryDriveOperation_(() => file.getName(), '既存ファイル名取得');
+    names[String(name || '').toLowerCase()] = true;
+  }
+  return names;
+}
+
+function safeFileName_(name) {
+  const value = cleanDriveName_(name).slice(0, 180).trim();
+  if (!value || value === '.' || value === '..') throw new Error('ファイル名が不正です。');
+  return value;
+}
+
+function extensionFromNameOrMime_(name, mimeType) {
+  const cleaned = safeFileName_(name);
+  const dot = cleaned.lastIndexOf('.');
+  if (dot > 0 && dot < cleaned.length - 1) return cleaned.slice(dot);
+  const map = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+    'image/gif': '.gif',
+    'application/pdf': '.pdf'
+  };
+  return map[String(mimeType || '').toLowerCase()] || '';
+}
+
+function compareNamesNatural_(a, b) {
+  return String(a || '').localeCompare(String(b || ''), 'ja', {
+    numeric: true,
+    sensitivity: 'base'
+  });
+}
+
+function getDriveFolderWithRetry_(folderId, label) {
+  return retryDriveOperation_(
+    () => DriveApp.getFolderById(String(folderId || '').trim()),
+    label
+  );
+}
+
+function retryDriveOperation_(operation, label) {
+  let lastError;
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      return operation();
+    } catch (error) {
+      lastError = error;
+      Utilities.sleep(400 * Math.pow(2, attempt));
+    }
+  }
+
+  throw new Error(label + 'に失敗しました: ' + (lastError && lastError.message ? lastError.message : lastError));
+}

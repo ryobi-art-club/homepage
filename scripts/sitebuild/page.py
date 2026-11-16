@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
-from .html import Markup, escape, html, rich_text
+from .html import JST, Markup, escape, html, jst_date, rich_text
 from .sections import (render_activity_cards, render_exhibition_archive, render_exhibition_recent, render_exhibition_upcoming,
                        render_hero, render_info_points, render_material_chips, render_recruit_calendar, render_request_cards,
                        render_timeline, render_update_log)
@@ -43,7 +43,7 @@ def build_seo_context(static: dict[str, Any], data: dict[str, Any]) -> dict[str,
     lastmod = None
     for ts in sorted((str(entry.get('timestamp', '')) for entry in data.get('change_log', []) if entry.get('timestamp')), reverse=True):
         try:
-            lastmod = datetime.fromisoformat(ts.replace('Z', '+00:00')).date().isoformat()
+            lastmod = jst_date(ts).isoformat()
             break
         except Exception:
             continue
@@ -55,7 +55,7 @@ def build_seo_context(static: dict[str, Any], data: dict[str, Any]) -> dict[str,
         'canonical': base_url or static.get('og_url', ''),
         'organization_json': json.dumps(organization, ensure_ascii=False),
         'website_json': json.dumps(website, ensure_ascii=False),
-        'lastmod': lastmod or datetime.now(timezone.utc).date().isoformat(),
+        'lastmod': lastmod or datetime.now(JST).date().isoformat(),
     }
 
 
@@ -117,7 +117,7 @@ def render_page(static: dict[str, Any], data: dict[str, Any]) -> str:
   <script type="application/ld+json">{organization_json}</script>
   <script type="application/ld+json">{website_json}</script>
   <link rel="stylesheet" href="stylesheet.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
   <script defer src="site.js"></script>
 </head>

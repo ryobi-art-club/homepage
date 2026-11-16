@@ -73,7 +73,6 @@
         "time_line": "10:00〜18:00（最終日は16:00まで）",
         "folder_id": "f-e1",
         "folder_url": "https://drive.google.com/drive/folders/f-e1",
-        "dm_image": "assets/exhibitions/e1/DM1-1000x1414.png",
         "dm_images": ["assets/exhibitions/e1/DM1-1000x1414.png", "assets/exhibitions/e1/DM2-1000x1414.png"],
         "works": [],
         "start_date": "2026-11-14"
@@ -89,7 +88,6 @@
         "time_line": "",
         "folder_id": "",
         "folder_url": "",
-        "dm_image": "",
         "dm_images": [],
         "works": [],
         "start_date": "2026-12-20"
@@ -107,7 +105,6 @@
         "time_line": "11:00〜19:00",
         "folder_id": "f-e3",
         "folder_url": "https://drive.google.com/drive/folders/f-e3",
-        "dm_image": "assets/exhibitions/e3/DM1-1000x1414.png",
         "dm_images": ["assets/exhibitions/e3/DM1-1000x1414.png"],
         "works": [
           { "image": "assets/exhibitions/e3/001-work-1200x1600.png", "title": "夕暮れ", "artist": "山田 花子" },
@@ -132,7 +129,6 @@
         "time_line": "",
         "folder_id": "f-e4",
         "folder_url": "https://drive.google.com/drive/folders/f-e4",
-        "dm_image": "assets/exhibitions/e4/DM1-1414x1000.png",
         "dm_images": ["assets/exhibitions/e4/DM1-1414x1000.png"],
         "works": [],
         "start_date": "2025-11-08"
@@ -148,7 +144,6 @@
         "time_line": "",
         "folder_id": "",
         "folder_url": "",
-        "dm_image": "",
         "dm_images": [],
         "works": [],
         "start_date": "2025-05-01"

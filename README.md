@@ -1,322 +1,145 @@
-# 凌美会ホームページ 公開サイト（homepage）
+# 凌美会ホームページ
 
-凌美会の公開サイト（<https://ryobi-art-club.github.io/homepage/>）を作るリポジトリです。管理画面で保存された内容（Google スプレッドシートと Drive）を読み、HTML を作って GitHub Pages で公開します。
+凌美会のホームページ（<https://ryobi-art-club.github.io/homepage/>）と、部員が内容を編集・公開する管理画面のリポジトリです。2つの部分でできています。
 
-**システム全体の説明・アカウント・運用・トラブルシュートは、管理画面のリポジトリ [homepage-cms の README](https://github.com/ryobi-art-club/homepage-cms) にまとめています。まずそちらを読んでください。** この資料は、公開サイトだけに関わることを書いています。
+| 場所 | 役割 |
+|---|---|
+| このリポジトリの直下（`scripts/`・`src/` など） | **公開サイト**。管理画面で保存された内容から HTML を作り、GitHub Pages で公開する |
+| `cms/` | 部員がホームページの内容を編集・公開する**管理画面**。Google Apps Script（GAS）で動く |
 
-AI エージェントに作業を頼むときの決まりごとは [`AGENTS.md`](AGENTS.md) にあります。
+2026年11月までは、管理画面を別のリポジトリ（`homepage-cms`。今は非公開のアーカイブ）に置いていました。
 
-## 目次
+**資料の前提**：開発・運用の資料は、プログラミングを少し知っている人を想定しています。GAS や GitHub に慣れていなくても読めるように書いています。
 
-1. [サイトの作られ方](#1-サイトの作られ方)
-2. [固定の文章や画像を変えるとき](#2-固定の文章や画像を変えるとき)
-3. [デザインや動きを変えるとき](#3-デザインや動きを変えるとき)
-4. [手元でのビルドと確認](#4-手元でのビルドと確認)
-5. [GitHub Actions とシークレット](#5-github-actions-とシークレット)
-6. [ページの構成と表示の決まり](#6-ページの構成と表示の決まり)
-7. [定期的な点検](#7-定期的な点検)
-8. [ファイルごとの詳細](#8-ファイルごとの詳細)
-9. [一から作り直すときのセットアップ手順](#9-一から作り直すときのセットアップ手順)
+**管理者**：資料の中の「管理者」は、このホームページを運用する人のことです。
 
----
+## こんなときは
 
-## 1. サイトの作られ方
+| したいこと | 読む資料 |
+|---|---|
+| 全体をざっとつかみたい | このページの「システムの全体像」 |
+| 管理者が交代する | [新しい管理者の確認事項](docs/operations.md#新しい管理者の確認事項) |
+| 部員を追加したい、年度替わりの作業をしたい、固定の文章を変えたい | [管理者の手順](docs/operations.md) |
+| 部員から相談された、エラーの通知メールが届いた、反映されない | [困ったとき](docs/troubleshooting.md) |
+| 実装を読み始めたい | [コードを読み始めるとき](docs/development.md#コードを読み始めるとき) |
+| コードを直したい（最初の環境づくりも） | [コードを直して反映する手順](docs/development.md) と [コードを書くときの決まり](docs/coding-rules.md) |
+| 管理画面の作りを調べたい | [管理画面の仕組み](docs/reference/cms.md) |
+| 公開サイトの作りを調べたい | [公開サイトの仕組み](docs/reference/site.md) |
+| スプレッドシートや保存する形を調べたい・変えたい | [データの約束](docs/reference/data.md) |
+| なぜこういう作りなのか知りたい | [設計の判断](docs/decisions.md) |
+| システムを一から作り直したい | [一から作り直す手順](docs/setup.md) |
 
+**AI エージェントに作業を頼むとき**：[`AGENTS.md`](AGENTS.md)（全体・公開サイト・管理画面）に作業の決まりごとをまとめています。
+
+## システムの全体像
+
+```mermaid
+flowchart LR
+  member(["部員"])
+
+  subgraph cmsBox["管理画面 cms/（GAS）"]
+    auth["ログイン<br>AppAuth.js"]
+    content["内容の保存・公開<br>Content*.js"]
+    media["画像<br>Media*.js"]
+    gem["目録の読み取り・誤字チェック<br>AppGemini.js"]
+    dispatch["サイトの作り直しを頼む<br>ContentSiteBuild.js"]
+  end
+
+  subgraph googleBox["Google のサービス"]
+    mail["Gmail"]
+    allow[("許可リスト<br>（スプレッドシート）")]
+    sheet[("内容のスプレッドシート<br>_PublishedState・ChangeLog など")]
+    drive[("Google Drive<br>画像のフォルダ")]
+    gemini["Gemini API"]
+  end
+
+  subgraph ghBox["GitHub（このリポジトリ）"]
+    actions["GitHub Actions<br>.github/workflows/deploy.yml"]
+    build["サイトを作る<br>scripts/ と src/"]
+    pages["GitHub Pages"]
+  end
+
+  visitor(["サイトを見る人"])
+
+  member -->|"HtmlService"| cmsBox
+  auth -->|"MailApp"| mail
+  auth -->|"SpreadsheetApp"| allow
+  content -->|"SpreadsheetApp<br>Sheets API"| sheet
+  media -->|"DriveApp"| drive
+  gem -->|"UrlFetchApp"| gemini
+  dispatch -->|"UrlFetchApp<br>GitHub API"| actions
+  actions --> build
+  sheet -->|"Sheets API<br>読み取りだけ"| build
+  drive -->|"Drive API<br>読み取りだけ"| build
+  build -->|"dist/"| pages
+  pages --> visitor
 ```
-管理画面で「公開する」（または GitHub で手動実行）
-    │
-    ▼
-GitHub Actions（.github/workflows/deploy.yml）
-    │
-    ├── ① scripts/fetch_google_content.py
-    │       スプレッドシート（_PublishedState と ChangeLog）→ build/runtime/content_snapshot.json
-    │       Drive の画像 → build/runtime/assets/
-    │       （サービスアカウントで、読み取り専用で読む）
-    │
-    ├── ② scripts/build_site.py
-    │       src/site_static.json（固定の文章）＋ ①の結果
-    │       → dist/（index.html、CSS、JS、画像、sitemap.xml）
-    │
-    └── ③ GitHub Pages に公開
+
+- 矢印の上の文字は、使っている Google や GitHub の機能です。GAS の中だけで使う機能（`CacheService` など）は、下の「使っている機能の一覧」にあります。
+- **データの置き場所はスプレッドシートと Drive だけ**です。管理画面にも公開サイトにも、データベースのようなものはありません。
+- **公開サイトは、管理画面の「公開する」かワークフローの手動実行で作り直します。** このリポジトリに push しただけでは反映されず、定期的な自動更新もありません。押してから数分で反映されます（コードを変えたときの作り直し方は [公開サイトを反映する](docs/development.md#公開サイトを反映する)）。
+- 管理画面での「下書き保存」は、スプレッドシートの内部用のシートに保存するだけで、公開サイトには影響しません。
+- 公開サイトに出るのは、管理画面で「公開中」になっている項目だけです。
+
+### どこを直せばよいか
+
+| 変えたいもの | 直す場所 | 反映のしかた |
+|---|---|---|
+| 展示会・活動記録・新歓・ご依頼の内容 | 管理画面で編集（コードは触らない） | 管理画面の「公開する」 |
+| 部員（ログインできる人） | 許可リストのスプレッドシート | すぐ反映（[部員を追加する・外す](docs/operations.md#部員を追加する外す)） |
+| サイトの固定の文章（紹介文、活動場所、年間スケジュール、連絡先など） | `src/site_static.json` | push してから手動実行（[固定の文章や画像を変える](docs/operations.md#固定の文章や画像を変える)） |
+| サイトの見た目・動き | `src/stylesheet.css`・`src/site.js`・`scripts/sitebuild/` | 同上（[公開サイトの見た目や動きを変えるとき](docs/development.md#公開サイトの見た目や動きを変えるとき)） |
+| ロゴ・部室の写真 | `src/logo.png`・`src/clubroom.jpg` | 同上 |
+| サイトがスプレッドシートや Drive から読む部分 | `scripts/fetch_google_content.py` | 同上。管理画面と同じデータを読むので、[データの約束](docs/reference/data.md) も合わせて直す |
+| 管理画面の画面 | `cms/Ui*.html` | `clasp -P cms push` してデプロイ（[管理画面を反映する](docs/development.md#管理画面を反映する)） |
+| 管理画面の保存・公開・画像・ログインの処理 | `cms/` の `.js` ファイル（[管理画面の仕組み](docs/reference/cms.md)） | 同上 |
+| サイトを作り直す手順そのもの | `.github/workflows/deploy.yml` | push すると次の公開から使われる |
+
+### 使っている機能の一覧
+
+| 使っている機能 | 使っている場所 | 何に使うか |
+|---|---|---|
+| `HtmlService` | `cms/AppMain.js` | 管理画面を表示する |
+| `SpreadsheetApp`・Sheets API | `cms/Content*.js`・`cms/AppAuth.js` | 内容と許可リストを読み書きする（Sheets API はまとめて速く読むため） |
+| `DriveApp` | `cms/Media*.js` | 画像とフォルダを扱う |
+| `MailApp` | `cms/AppAuth.js`・`cms/AppErrorReport.js` | 確認コードと、管理者へのエラー通知を送る |
+| `CacheService` | `cms/AppAuth.js`・`cms/AppErrorReport.js` | 確認コード・ログインの状態・回数の上限を覚えておく（最長6時間） |
+| `LockService` | `cms/ContentApi.js`・`cms/ContentProofread.js`・`cms/MediaApi.js` | 2人が同時に保存・公開しても壊れないよう、順番にする |
+| `PropertiesService` | `cms/AppConfig.js`・`cms/AppErrorReport.js` | 設定値（Script Properties）を読む |
+| `UrlFetchApp` → Gemini API | `cms/AppGemini.js`（`MediaCatalog.js`・`ContentProofread.js` から呼ぶ） | 目録の画像から作品名と作者を読む、公開前に誤字を探す |
+| `UrlFetchApp` → GitHub API | `cms/ContentSiteBuild.js` | GitHub App の権限で、サイトを作り直すワークフローを起動する |
+| Sheets API・Drive API（サービスアカウント） | `scripts/fetch_google_content.py` | 公開した内容と画像を、読み取りだけの権限で取ってくる |
+| GitHub Actions・GitHub Pages | `.github/workflows/deploy.yml`・`check.yml` | サイトを作って公開する。push のたびにテストする |
+
+設定値の一覧は [管理画面の仕組み](docs/reference/cms.md) の「Script Properties（設定値）」にあります。
+
+### 公開サイトの作られ方
+
+```mermaid
+sequenceDiagram
+  actor member as 部員
+  participant cms as 管理画面（GAS）
+  participant google as スプレッドシート・Drive
+  participant actions as GitHub Actions
+  participant pages as GitHub Pages
+
+  member->>cms: 「公開する」
+  cms->>cms: 誤字チェック（Gemini API）
+  cms->>google: 公開する内容を _PublishedState に保存<br>画像を公開用のフォルダへ移す<br>ChangeLog に更新履歴を足す
+  cms->>actions: ワークフローを起動（GitHub API）
+  cms-->>member: 「公開を開始しました」
+  actions->>google: ① scripts/fetch_google_content.py<br>内容と画像を読み取りだけで取る
+  actions->>actions: ② scripts/build_site.py<br>src/ と ①の結果から dist/ を作る
+  actions->>pages: ③ dist/ を公開
+  Note over member,pages: 「公開する」から数分でサイトに出る
 ```
 
-- **サイトは自動では作り直されません。** このリポジトリに push しただけでは反映されず、管理画面の「公開する」か、GitHub の「Actions」→「Build and Deploy Ryobi Site」→「Run workflow」で作り直します。
 - ページは `index.html` の1枚だけで、タブの切り替えなどは `site.js` で行います。
 
----
+## 著作権
 
-## 2. 固定の文章や画像を変えるとき
+© 神戸大学美術部凌美会
 
-管理画面で編集できないもの（紹介文、活動場所、年間スケジュール、画材、連絡先、SNS など）は、`src/site_static.json` を直接編集します。編集したら commit・push し、上の方法でサイトを作り直してください。
-
-| 内容 | 編集する場所 |
-|---|---|
-| 展示会・活動記録・新歓カレンダー・ご依頼事例 | 管理画面（このリポジトリでは編集しない） |
-| 部の名前、トップの見出し、紹介文 | `site_static.json` の `club_name_jp`、`hero_…`、`intro_text` など |
-| 各タブの説明文 | `site_static.json` の `exhibitions_static.summary` など |
-| 入部希望の方：基本情報・画材・年間スケジュール | `site_static.json` の `recruit_static` |
-| ご依頼の方：連絡先 | `site_static.json` の `requests_static` |
-| SNS のリンク、コピーライト | `site_static.json` の `social_links`、`copyright` |
-| ロゴ、部室の写真 | `src/logo.png`、`src/clubroom.jpg` |
-| デザイン・動き | `src/stylesheet.css`、`src/site.js`、`scripts/sitebuild/`（[3](#3-デザインや動きを変えるとき)） |
-
-### `site_static.json` の項目
-
-| 項目 | 内容 |
-|---|---|
-| `club_name_jp` / `club_name_en` | 部の名前（日本語・英語） |
-| `hero_kicker` / `hero_title` / `hero_subtitle` | トップの小見出し・見出し・説明 |
-| `og_url` | サイトの正式な URL（SNS で共有したときの表示、検索エンジン向けの情報、sitemap に使う） |
-| `og_image` | SNS で共有したときの画像（`logo.png` または URL） |
-| `intro_text` | 紹介文 |
-| `information_text` | INFORMATION の説明文 |
-| `exhibitions_static.summary` / `activities_static.summary` | 展示会・活動記録タブの説明文 |
-| `recruit_static` | 入部希望の方タブ。`headline`（見出し）、`summary`（説明）、`info_points`（基本情報）、`materials`（画材・道具）、`annual_schedule`（年間スケジュール） |
-| `requests_static` | ご依頼の方タブ。`summary`、`contact_email`、`contact_instagram`、`contact_x` |
-| `social_links` | `instagram` / `x` / `email` |
-| `copyright` | フッターの著作権表示 |
-
-**`recruit_static` の中身**
-
-- `info_points`：`label`（項目名）と `text`（内容）の並び。写真を付けるときは `image`（`src/` に置いたファイル名）、地図などへのリンクを付けるときは `link`（`url` と `label`）を足す。
-- `materials`：`name`（画材の名前）と `note`（説明）の並び。
-- `annual_schedule`：`period`（時期）、`label`（内容）、`accent`（色：`yellow` / `blue` / `green` / `white`）の並び。
-
-**文章の中のリンク**：`hero_subtitle`、`intro_text`、`information_text`、各タブの `summary`、`info_points` の `text` では、`[表示する文字](https://example.com)` と書くとリンクになります。
-
-### 写真を増やすときの注意
-
-`src/` の画像は、ビルドの最後に `build_site.py` が**ファイル名を指定して** `dist/` にコピーしています（`STATIC_FILES` の `logo.png`、`clubroom.jpg`）。写真を増やしたら、ここにも名前を足してください。足さないと、サイトで画像が表示されません。
-
----
-
-## 3. デザインや動きを変えるとき
-
-- HTML は `scripts/sitebuild/` が Python で組み立てています（外部のテンプレートの仕組みは使っていません）。HTML は `html()`（`sitebuild/html.py`）で作ります。`{名前}` に入れた値は文字として表示されるように書き換わるので、内容に `<` や `"` があってもページは崩れません。管理画面の画面の作り方（`html`…`` ）と同じ考え方です。
-- 見た目を変えないはずの作業（整理など）では、作業の前後で `tools/screenshot/` の撮影を比べます（[4](#4-手元でのビルドと確認)）。
-- 見た目は `src/stylesheet.css`、動き（タブ、写真の拡大表示、スライド）は `src/site.js` です。外部のライブラリは使っていません（アイコンだけ Font Awesome を読み込んでいます）。
-- 管理画面の右側の「プレビュー」は、このサイトの見た目をまねて作っています（homepage-cms の `UiStyles.html` の「サイトプレビュー」の部分）。サイトの見た目を変えたら、管理画面のプレビューも合わせて直すと、部員が公開前に確認しやすくなります。
-- 変えたら、手元でビルドして確認します（[4](#4-手元でのビルドと確認)）。
-- 名前の付け方・二重管理をしない・言葉・HTML・CSS の決まりは、管理画面と共通です（homepage-cms の README の「11. コードを書くときの決まり」）。CSS の色や大きさは、`src/stylesheet.css` の先頭の決まった値から役割で選びます。
-
----
-
-## 4. 手元でのビルドと確認
-
-手元でビルドするには、サービスアカウントの鍵（JSON）が必要です。鍵は管理者から受け取り、**リポジトリの外**に置いてください（`.gitignore` で `*service-account*.json` などを除外していますが、念のため）。
-
-```bash
-cd homepage
-pip install -r requirements.txt
-
-# ① 内容と画像を取得
-python scripts/fetch_google_content.py \
-  --service-account-json <鍵ファイルのパス> \
-  --content-spreadsheet-id <コンテンツ用スプレッドシートの ID> \
-  --output-json build/runtime/content_snapshot.json \
-  --assets-dir build/runtime/assets   --cache-dir build/cache/drive    # 省略できる。付けると、2回目から変わった画像だけを取得する
-
-# ② HTML を作る
-python scripts/build_site.py \
-  --static-config src/site_static.json \
-  --content-snapshot build/runtime/content_snapshot.json \
-  --assets-root build/runtime/assets \
-  --output-dir dist
-
-# ③ 確認（ブラウザで http://localhost:8000 を開く）
-cd dist
-python -m http.server 8000
-```
-
-`build/` と `dist/` は Git に入りません。
-
-**テスト**：鍵がなくても動きます（Google には接続せず、偽の Sheets と Drive を使う）。GitHub Actions では、プッシュのたび（`check.yml`）と、ビルドの前（`deploy.yml`）に動かします。ビルドの前のテストが通らなければビルドは止まり、サイトは前の状態のまま残ります。
-
-**公開してはいけないものを入れない**：このリポジトリは公開しています。`tests/test_repository_contents.py` は、メールアドレス（見本用のドメインと、サイトに載せている部の連絡先を除く）・管理画面の URL・鍵・Excel のファイルなどが入っていたら失敗します。プッシュしたあとでは遅いので、**クローンしたら1回だけ**次を実行し、コミットの前にも確かめるようにしてください（`.githooks/pre-commit` が動きます）。
-
-```bash
-git config core.hooksPath .githooks
-```
-
-あわせて、GitHub の「Settings」→「Advanced Security」→「Secret Protection」の「Push protection」を有効にしておくと、鍵などの形をしたものはプッシュの時点で GitHub が止めます。
-
-```bash
-python -m unittest discover tests
-```
-
-`tests/test_fetch_google_content.py` は、`_PublishedState` の読み方（セルを分けた形を含む）、版が違う内容で止まること、サイトのデータの作り方、更新履歴の表示、画像のキャッシュを確かめます。
-
-**見本のデータでの撮影**：鍵がなくても、見本のデータ（`tools/screenshot/sample-content.json`）でサイトを作り、パソコン・タブレット・スマホ・スマホ横向きで撮影できます。Chrome と Node.js が必要です。見た目を変えないはずの作業では、作業の前後の画像を1画素ずつ比べます。
-
-```bash
-npm install --prefix tools/screenshot
-node tools/screenshot/shoot.cjs                       # tools/screenshot/out/shots/ に保存
-node tools/screenshot/compare.cjs --save <控えのフォルダ>   # 作業の前に控えを取る（リポジトリの外に置く）
-node tools/screenshot/compare.cjs <控えのフォルダ>          # 作業のあとに比べる
-```
-
-撮影は、動きを減らす設定（`prefers-reduced-motion`）で行います。スライドショーなどの時間で動く表示が止まり、何度撮っても同じ画像になります。画面の横はみ出しと、画面のエラーも報告します。
-
----
-
-## 5. GitHub Actions とシークレット
-
-ワークフロー（`.github/workflows/deploy.yml`）は `workflow_dispatch`（手動または管理画面からの起動）だけで動きます。
-
-| ジョブ | 内容 |
-|---|---|
-| `build` | Python の準備 → テスト → 前回の画像のキャッシュを戻す → 内容の取得 → HTML を作る → GitHub Pages 用にまとめる → 画像のキャッシュを保存し、古いキャッシュを消す |
-| `deploy` | GitHub Pages に公開する |
-
-### 画像のキャッシュ
-
-ビルドで一番時間がかかるのは、Drive からの画像の取得です（2026年10月の時点で、3分のうち2分40秒）。画像は展示会ごとに増え続けるので、前回のビルドで取得した画像を GitHub Actions のキャッシュ（`drive-images-…`）に取っておき、**新しい画像と、Drive で中身が変わった画像だけ**を取得します（Drive のチェックサム `md5Checksum` で判定）。取得は8枚ずつ同時に行い、ファイルの情報は100件ずつまとめて問い合わせます。
-
-- **キャッシュには、今のサイトに載っている画像だけを入れます。** 公開リポジトリのキャッシュは、プルリクエストを作れる人（GitHub のアカウントがあれば誰でも）なら中身を読めるためです（[GitHub の説明](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching)）。取得の最後に、サイトに使わなかった画像をキャッシュから消し（`prune_cache`）、保存したあとで前回までのキャッシュを消します。非公開にした・削除した画像は、次のビルドでキャッシュからなくなります。
-- **すぐに消したいとき**（作品を消してほしいと頼まれたときなど）：管理画面で非公開にして公開したあと、GitHub の「Actions」→ 左のメニューの「Caches」で `drive-images-` のキャッシュを消してください。消しても、次のビルドが画像を全部取得し直すだけで、困ることはありません。古いキャッシュを消す手順が失敗した場合も、使われないキャッシュは7日で GitHub が消します。
-- ビルドの記録（ログ）には、`Images: 120 used, 3 downloaded, 117 from cache, 2 removed from cache` のように、取得した枚数だけが出ます。
-- 完成したサイト一式（Pages 用にまとめたもの）も、GitHub に1日だけ残ります。中身は公開したサイトそのものです。
-
-リポジトリの「Settings」→「Secrets and variables」→「Actions」に、次のシークレットが必要です。
-
-| 名前 | 内容 |
-|---|---|
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | サービスアカウントの鍵（JSON ファイルの中身をそのまま貼る） |
-| `CONTENT_SPREADSHEET_ID` | コンテンツ用スプレッドシートの ID |
-
-サービスアカウントは、スプレッドシートと Drive を**読み取り専用**で使います。コンテンツ用スプレッドシートと、Drive の4つのルートフォルダを、サービスアカウントのメールアドレス（`…@….iam.gserviceaccount.com`）に「閲覧者」で共有しておく必要があります。
-
----
-
-## 6. ページの構成と表示の決まり
-
-```
-ナビゲーション（ロゴ、ABOUT / INFO へのリンク、SNS）
-トップ（#home）
-ABOUT（#about）：紹介文と更新履歴（UPDATE LOG）
-INFORMATION（#info-tabs）：タブで切り替え
-  ├── 展示会：開催予定 → 直近の展示（作品一覧つき）→ 過去の展示
-  ├── 活動記録・告知
-  ├── 入部希望の方：基本情報、画材、年間スケジュール、新歓カレンダー
-  └── ご依頼の方：連絡先、過去の取り組み事例
-フッター
-```
-
-- **展示会の住所**は Google マップを開くリンクにしています（会場名と住所で検索）。下線は住所の文字にだけ引き、地図のアイコンには引きません。地図の埋め込みはしていません（理由は homepage-cms の README の「設計の判断メモ」）。
-- **会期**は、管理画面が開始日・終了日から作った表示（`date_line`）をそのまま出します。
-- **作品一覧**は、登録した順に行ごとに並べ、1行の高さをそろえて、幅を画像の縦横比に合わせます（`render_work_gallery` と CSS の `.work-gallery`）。
-- **記事や事例の写真**は最大10枚まで使い、4枚まで並べて、それ以上は「+N」と表示します。押すと拡大表示（ライトボックス）になります。
-- **新歓カレンダー・DM** はスライド表示です。新歓カレンダーは10枚まで出します。枠の縦横比は、横長の画面（パソコンなど）ではいちばん横長の画像に、縦長の画面（スマホなど）ではいちばん縦長の画像に合わせます（16:9〜4:5）。横長の画面では大きさが画面の高さで、縦長の画面では画面の幅で決まるので、こうするとどの画像も切れずに、いちばん大きく表示されます。パワーポイントの横長の画像も、Instagram 用の正方形・縦長の画像も使えます。DM は、画面の高さに収まる大きさにします。
-- **更新履歴**は、今も公開中の項目に関係するものだけを表示します。`ChangeLog` には変更の種類と項目の ID だけがあり、文言は表示するときに今のタイトルで作ります（`change_log_text`）。そのため、項目の名前を変えると過去の行も新しい名前で出ます。文言（`CHANGE_LOG_TEXT`）は管理画面の `ContentHistory.js` の `CHANGE_LOG_ITEM_LISTS` と同じにし、変えるときは両方を一緒に直します。
-- **検索エンジン向け**：タイトル、説明、SNS で共有したときの表示、`sitemap.xml` を自動で作ります。`src/verification/` の HTML は Google Search Console の所有確認用で、そのまま公開されます。
-
----
-
-## 7. 定期的な点検
-
-| 項目 | 確認すること |
-|---|---|
-| Python のライブラリ | `requirements.txt` は大きな版上げで壊れないよう上限（`<3` など）を付けています。上限を上げるときは、手元でビルドして確かめてから |
-| GitHub Actions の部品 | 実行結果に古い版の警告が出たら、`deploy.yml` の `actions/checkout@v5` などを上げる |
-| Font Awesome | `scripts/sitebuild/page.py` で 6.4.2 を読み込んでいる |
-| サービスアカウントの鍵 | 使えなくなったら新しい鍵を作り、シークレット `GOOGLE_SERVICE_ACCOUNT_JSON` を入れ替える |
-
----
-
-## 8. ファイルごとの詳細
-
-```
-homepage/
-├── requirements.txt              Python のライブラリ
-├── .github/workflows/deploy.yml  ビルドと公開のワークフロー
-├── scripts/
-│   ├── fetch_google_content.py   スプレッドシート・Drive → JSON と画像
-│   ├── build_site.py             JSON → HTML（入口：読み込み・書き出し・コピー）
-│   └── sitebuild/
-│       ├── html.py               HTML を作る道具（html()・rich_text()）
-│       ├── sections.py           部品ごとの HTML（更新履歴・展示会・記事・入部案内・ヒーロー）
-│       ├── page.py               ページ全体の組み立てと SEO
-│       └── images.py             画像の縦横比の読み取り
-├── tools/screenshot/             見本のデータでの撮影と比較（Node.js。公開しない）
-└── src/
-    ├── site_static.json          固定の文章
-    ├── stylesheet.css            見た目
-    ├── site.js                   動き
-    ├── logo.png / clubroom.jpg   画像
-    └── verification/             Google Search Console の所有確認ファイル
-```
-
-### `scripts/fetch_google_content.py`
-
-| 関数 | 役割 |
-|---|---|
-| `build_clients()` | サービスアカウントの鍵から、スプレッドシートと Drive を読む準備をする（読み取り専用） |
-| `DriveFiles` | Drive の読み取り。ファイルの情報をまとめて問い合わせ（`prefetch_meta`）、画像を同時に取得し（`download`・`finish`）、キャッシュを整理する（`prune_cache`） |
-| `get_sheet_rows()` | シートの各行を、1行目の見出しを名前にして読む |
-| `read_published_content()` | `_PublishedState` から公開中の内容を読む（分けて書かれたセルをつなぎ直し、版を確かめる） |
-| `referenced_file_ids()` | サイトに載せる画像のファイル ID を集める（情報をまとめて問い合わせるため） |
-| `item_images()` | 項目の画像を、登録した順（`mediaFileIds`）に10枚まで取得する |
-| `normalize_recruit_calendar()` | 公開中の新歓カレンダーと画像 |
-| `normalize_activity_articles()` | 公開中の活動記録と画像 |
-| `normalize_requests()` | 公開中のご依頼事例と画像 |
-| `normalize_exhibitions()` | 公開中の展示会を開催予定とアーカイブに分け、DM・作品の画像を取得 |
-| `normalize_change_log()` | 更新履歴の行（`kind`・`item_id`・`note`） |
-
-読むシートは `_PublishedState` と `ChangeLog` です（各シートの列は homepage-cms の README の「スプレッドシートの構成」）。
-
-- **内容は `_PublishedState` から読みます**（`read_published_content`）。管理画面が公開のたびに、公開した内容全体を JSON で書くシートです。JSON の形（版2）は homepage-cms の README の「8-4」にあります。1つのセルに入りきらないとき（45,000文字超）は、管理画面が20,000文字ずつ横の列（`payload_json_2`…）に分けて書き、`payload_json` には `{"storage_format": "chunked-json-v1", "chunk_count": n}` を書きます。読むときにつなぎ直します。
-- `_PublishedState` が読めないときは、ビルドを止めます。サイトは前の状態のまま残ります（空のサイトを公開しないため）。
-- `formatVersion` が今の版（2）でない内容は読まずに、ビルドを止めます。形を変えるときは、管理画面と一緒に版を上げます（homepage-cms の README「8-4」の「形の版」）。
-- 並び順は、管理画面で並べた一覧の順番のままです（ご依頼事例・作品）。
-
-### `scripts/build_site.py` と `scripts/sitebuild/`
-
-| 場所 | 関数 | 役割 |
-|---|---|---|
-| `build_site.py` | `main()` | 全体の流れ。最後に `src/` のファイルを `dist/` にコピーする（[写真を増やすときの注意](#写真を増やすときの注意)） |
-| `page.py` | `render_page()` | ページ全体を組み立てる |
-| `page.py` | `build_seo_context()` / `render_sitemap_xml()` | 検索エンジン向けの情報と sitemap |
-| `sections.py` | `render_update_log()` / `change_log_text()` | 更新履歴。日ごとにまとめ、同じ日の同じ文言は1つにする |
-| `sections.py` | `render_exhibition_card()`（`render_exhibition_upcoming()` / `_recent()` / `_archive()` から使う） | 展示会のカード（開催予定・直近・過去） |
-| `sections.py` | `render_exhibition_meta()` / `render_venue_address()` | 展示会の会期と会場。住所を Google マップへのリンクにする |
-| `sections.py` | `render_work_gallery()` | 作品一覧 |
-| `sections.py` | `render_activity_cards()` / `render_request_cards()` | 活動記録・ご依頼事例 |
-| `sections.py` | `render_image_grid()` / `render_carousel()` / `render_recruit_calendar()` | 写真の並べ方・スライド |
-| `sections.py` | `render_timeline()` / `render_info_points()` / `render_material_chips()` | 年間スケジュール・入部の基本情報・画材 |
-| `sections.py` | `render_hero()` | ページの先頭（直近の展示会の作品のスライドショー） |
-| `html.py` | `html()` / `rich_text()` | HTML を作る。改行を `<br>` に、`[文字](URL)` をリンクにする |
-| `images.py` | `image_aspect()` | 画像の縦横比を読む（並べ方の調整に使う） |
-
-管理画面のプレビュー（homepage-cms の `UiPreview.html`）は、この部品をまねています。対応する関数は次のとおりです。
-
-| サイト（`sections.py`） | 管理画面のプレビュー（`UiPreview.html`） |
-|---|---|
-| `render_exhibition_card()` | `buildExhibitionPreviewCardHtml()` |
-| `render_exhibition_meta()` | `buildMetaListHtml()` |
-| `render_work_gallery()` | `buildWorkGalleryPreviewHtml()` |
-| `render_activity_cards()` / `render_request_cards()` | `buildArticlePreviewHtml()` |
-| `render_image_grid()` / `render_carousel()` | `buildThumbCarouselHtml()` |
-| `render_recruit_calendar()` | `buildRecruitPreviewHtml()` |
-
----|---|
-| `render_page()` | ページ全体を組み立てる |
-| `build_seo_context()` / `render_sitemap_xml()` | 検索エンジン向けの情報と sitemap |
-| `render_update_log()` / `change_log_text()` | 更新履歴。日ごとにまとめ、同じ日の同じ文言は1つにする |
-| `render_exhibition_upcoming()` / `render_exhibition_recent()` / `render_exhibition_archive()` | 展示会（開催予定・直近・過去） |
-| `render_exhibition_meta()` / `render_venue_address()` | 展示会の会期と会場。住所を Google マップへのリンクにする |
-| `render_work_gallery()` | 作品一覧 |
-| `render_activity_cards()` / `render_request_cards()` | 活動記録・ご依頼事例 |
-| `render_image_grid()` / `render_carousel()` / `render_recruit_calendar()` | 写真の並べ方・スライド |
-| `render_timeline()` / `render_info_points()` | 年間スケジュール・入部の基本情報 |
-| `image_aspect()` | 画像の縦横比を読む（並べ方の調整に使う） |
-| `main()` | 全体の流れ。最後に `src/` のファイルを `dist/` にコピーする（[写真を増やすときの注意](#写真を増やすときの注意)） |
-
----
-
-## 9. 一から作り直すときのセットアップ手順
-
-1. **Google Cloud でサービスアカウントを作る**：[Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作り、「Google Sheets API」と「Google Drive API」を有効にする。サービスアカウントを作り、鍵（JSON）を作ってダウンロードする。
-2. **共有する**：コンテンツ用スプレッドシートと Drive の4つのルートフォルダを、サービスアカウントのメールアドレスに「閲覧者」で共有する。
-3. **GitHub Pages を有効にする**：リポジトリの「Settings」→「Pages」で、Source を「GitHub Actions」にする。
-4. **シークレットを登録する**（[5](#5-github-actions-とシークレット)）。
-5. **管理画面から動かしてみる**：管理画面で「公開する」を押し、Actions が成功してサイトが表示されるか確かめる。
+- このリポジトリのコード・デザイン（CSS）・ロゴ・固定の文章の著作権は、神戸大学美術部凌美会にあります。見ていただくのは歓迎しますが、許可なく使ったり、複製してサイトを作ったりすることはできません。
+- サイトに載せている作品の画像の著作権は、それぞれの作者にあります。
+- ライセンス（使ってよいという許可）は付けていません。理由は [設計の判断](docs/decisions.md)。
