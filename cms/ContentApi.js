@@ -3,20 +3,31 @@
 function getBootstrapData(sessionToken) {
   const session = requireSession_(sessionToken);
   // シートを1枚ずつ読むと、画面を開く8秒のうち7秒かかっていた（2026年10月に計測）。まとめて読む
-  const source = prefetchSheets_([CONTENT_SHEETS.publishedState, CONTENT_SHEETS.changeLog, CONTENT_SHEETS.drafts, CONTENT_SHEETS.adminLog]);
-  const state = readContentState_(source);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(SUBMIT_LOCK_WAIT_MS);
+  let state, drafts, adminLog;
+  try {
+    const source = prefetchSheets_([CONTENT_SHEETS.publishedState, CONTENT_SHEETS.changeLog, CONTENT_SHEETS.drafts, CONTENT_SHEETS.adminLog]);
+    const publishedInfo = readPublishedState_(source);
+    state = readContentState_(source, publishedInfo);
+    state.baseVersion = buildContentBaseVersion_(publishedInfo);
+    drafts = readDrafts_(source);
+    adminLog = readAdminLog_(source);
+  } finally {
+    lock.releaseLock();
+  }
   return sanitizeForClient_({
     viewerEmail: session.email,
     viewerName: session.name || session.email,
     previewUrl: SITE_URL,
     state: state,
-    drafts: readDrafts_(source),
-    adminLog: readAdminLog_(source),
+    drafts: drafts,
+    adminLog: adminLog,
     maintenance: getDriveMaintenanceSummary_(state)
   });
 }
 
-// 保存・公開は、ほかの保存・公開・アップロードが終わるのを30秒まで待つ
+// 初期読み込み・保存・公開は、ほかの保存・公開・アップロードが終わるのを30秒まで待つ
 const SUBMIT_LOCK_WAIT_MS = 30000;
 
 // 公開のあとの片付けはこの時間で打ち切り、残りは次の公開で続ける
@@ -40,7 +51,7 @@ function loadDraft(sessionToken, draftId) {
   const drafts = readDrafts_();
   const match = drafts.find((item) => item.draftId === draftId);
   if (!match) throw new Error('指定した下書きが見つかりません。');
-  return Object.assign(contentLists_(match.payload), { manualChangeNote: match.payload.manualChangeNote || '' });
+  return Object.assign(contentLists_(match.payload), { manualChangeNote: match.payload.manualChangeNote || '', baseVersion: match.payload.baseVersion || '' });
 }
 
 function previewSiteHistory(sessionToken, payload) {
@@ -73,10 +84,14 @@ function publishState(sessionToken, payload) {
   lock.waitLock(SUBMIT_LOCK_WAIT_MS);
   mark('lock');
   try {
-    const currentState = readContentState_();
-    const normalized = normalizePayload_(payload, currentState);
     const publishedInfo = readPublishedState_();
+    requireContentBaseVersion_(payload, publishedInfo);
+    const currentState = readContentState_(undefined, publishedInfo);
+    const normalized = normalizePayload_(payload, currentState);
     mark('read');
+    /* 内容が同じ公開や途中失敗でも、以前の画面・下書きを最新として使い回させない。
+       シートの復旧では戻らない場所に記録し、画像を動かす前に確定する。 */
+    PropertiesService.getScriptProperties().setProperty(CONTENT_EDIT_GENERATION_PROPERTY, Utilities.getUuid());
     const emptyExhibitionFolders = finalizeManagedFolders_(normalized, publishedInfo.payload, driveStats);
     mark('drive (' + Object.keys(driveStats).map((kind) => kind + ' ' + driveStats[kind].processed + '/' + driveStats[kind].total).join(', ') + ')');
     const currentPayloadJson = stableStringify_(buildPublicSnapshot_(normalized));

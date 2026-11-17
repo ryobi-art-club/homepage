@@ -27,6 +27,7 @@ const now = '2026-10-28T03:00:00.000Z';
 const artists = ['山田 花子', '佐藤 太郎', '鈴木 一郎', '高橋 美咲', '田中 健', 'Alexandra Konstantinopoulou'];
 
 const state = {
+  baseVersion: 'preview-initial',
   recruitCalendars: [
     { year: '2026', mediaFolderId: 'f-recruit-2026', mediaFileIds: ids('f-recruit-2026'), published: true },
     { year: '2025', mediaFolderId: 'f-recruit-2025', mediaFileIds: ids('f-recruit-2025'), published: false }

@@ -43,7 +43,7 @@
     loadDraft: (_, draftId) => {
       const draft = (data.bootstrap.drafts || []).find((item) => item.draftId === draftId);
       if (!draft) throw new Error('指定した下書きが見つかりません。');
-      return clone(draft.payload);
+      return Object.assign(clone(draft.payload), { baseVersion: draft.payload.baseVersion || '' });
     },
     previewSiteHistory: () => ({ compared: data.siteHistory || [] }),
     /* 管理者への自動通知の結果。URL の ?notify=sent などか、コンソールで MOCK_BACKEND.notifyMode = 'sent' で切り替える */
@@ -62,9 +62,11 @@
       return { ok: true, message: '下書きを保存しました。' };
     },
     publishState: (_, payload) => {
+      if (!payload.baseVersion || payload.baseVersion !== data.bootstrap.state.baseVersion) throw new Error('公開内容が更新されたか、編集の元の内容を確認できません。');
       if (window.MOCK_BACKEND.publishFailure === 'before-save') throw new Error('ファイル取得に失敗しました: プレビュー用');
+      data.bootstrap.state.baseVersion = nextId('version');
       const summary = '[プレビュー] 公開内容を更新';
-      data.bootstrap.state = Object.assign({}, data.bootstrap.state, clone(payload));
+      data.bootstrap.state = Object.assign({}, data.bootstrap.state, clone(payload), { baseVersion: data.bootstrap.state.baseVersion });
       data.bootstrap.state.changeLog = [{ timestamp: new Date().toISOString(), kind: 'note', itemId: '', note: summary, actorName: data.bootstrap.viewerName }].concat(data.bootstrap.state.changeLog || []);
       data.bootstrap.drafts = [];
       /* 本物の公開と同じく、公開中の項目のフォルダはリンクで見られるようにする */

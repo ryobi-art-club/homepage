@@ -45,7 +45,8 @@ function normalizePayload_(payload, existingState, options) {
     exhibitions: normalizeExhibitions_(payload.exhibitions, existingState.exhibitions || [], options),
     requestCases: normalizeRequestCases_(payload.requestCases, options),
     changeLog: existingState.changeLog || [],
-    manualChangeNote: cleanMultiline_(payload.manualChangeNote, 500)
+    manualChangeNote: cleanMultiline_(payload.manualChangeNote, 500),
+    baseVersion: typeof payload.baseVersion === 'string' ? payload.baseVersion : ''
   };
 }
 
@@ -192,5 +193,6 @@ function buildDraftPayload_(state) {
   const draft = buildPublicSnapshot_(state);
   draft.exhibitions.forEach((item, index) => item.draftCreatedAt = state.exhibitions[index].draftCreatedAt || '');
   draft.manualChangeNote = state.manualChangeNote || '';
+  draft.baseVersion = typeof state.baseVersion === 'string' ? state.baseVersion : '';
   return draft;
 }

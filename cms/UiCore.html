@@ -378,6 +378,7 @@ function escapeHtml(value) {
    システム側の問題（important）は管理者へ自動通知し、どのエラーも報告用の文面をコピーできるようにする。
    報告文にはセッショントークンなどの秘密情報を含めない。 */
 const ERROR_RULES = [
+  { pattern: /^公開内容が更新されたか、編集の元の内容を確認できません。$/, important: false, hint: '編集内容を控えてから再読み込みし、変更を入れ直してください。', conflict: true },
   { pattern: /^(GitHub Actions の起動に失敗しました:|GitHub App の installation token 取得に失敗しました:|GitHub App 用の Script Properties が不足しています。$)/, operation: '公開', important: true, hint: '内容は保存済みですが、サイトに反映できませんでした。' },
   { pattern: /セッションが切れています/, important: false, hint: 'ログインの有効期限が切れました。未保存の内容を控えてから再読み込みしてください。' },
   { pattern: /Excel 読み込み用ライブラリ/, important: true, hint: 'Excel の目録は今は読み込めません。Excel の「名前を付けて保存」で CSV 形式にして選び直すか、PDF・画像の目録を使ってください。' },
@@ -431,6 +432,7 @@ function describeError(error, operation, now = new Date()) {
     message,
     hint: rule ? rule.hint : (unexpected ? UNEXPECTED_ERROR_HINT : ''),
     important: rule ? rule.important : unexpected,
+    conflict: !!(rule && rule.conflict),
     panel: activePanelLabel(),
     userAgent: typeof navigator !== 'undefined' ? String(navigator.userAgent || '').slice(0, 300) : ''
   };
@@ -469,6 +471,7 @@ function showError(error, operation, target = '') {
   } else {
     setStatus(summary, 'error', { report, historyMessage: full });
   }
+  if (report.conflict) openErrorReportCard(report, 'manual');
   if (report.important) notifyErrorReport(report);
   return report;
 }
@@ -633,20 +636,36 @@ function openErrorReportCard(report, state) {
     </div>
     ${report.hint && html`<p class="error-report-hint">${report.hint}</p>`}
     <p class="error-report-message"><span>エラーの内容</span>${report.message}</p>
-    <p class="error-report-notify" data-error-report-notify></p>
+    ${report.conflict && state !== 'copy_failed' ? html`<p class="small-note">控えに画像ファイルは含まれません。</p>` : html`<p class="error-report-notify" data-error-report-notify></p>
     <details class="error-report-details"${state === 'copy_failed' && html` open`}>
       <summary>報告用の内容を表示</summary>
       <textarea readonly rows="6" aria-label="報告用の内容">${report.text}</textarea>
-    </details>
+    </details>`}
     <div class="error-report-actions">
-      <button class="button success" type="button" data-error-report-copy>エラー内容をコピー</button>
+      ${report.conflict && html`<button class="button success" type="button" data-editing-content-download>編集内容を控える</button>`}
+      ${!report.conflict && html`<button class="button success" type="button" data-error-report-copy>エラー内容をコピー</button>`}
       <button class="button ghost" type="button" data-error-report-close>閉じる</button>
     </div>`;
   card.querySelectorAll('[data-error-report-close]').forEach((button) => button.addEventListener('click', () => closeErrorReportCard()));
+  const downloadButton = card.querySelector('[data-editing-content-download]');
+  if (downloadButton) downloadButton.addEventListener('click', downloadEditingContent);
   const copyButton = card.querySelector('[data-error-report-copy]');
-  copyButton.addEventListener('click', () => copyErrorReport(report, copyButton));
+  if (copyButton) copyButton.addEventListener('click', () => copyErrorReport(report, copyButton));
   updateErrorReportCard(report, state);
   if (state === 'copy_failed') card.querySelector('textarea').select();
+}
+
+/* 画像本体やログイン情報は含めず、入力した文章・作品情報・画像の参照を手元へ控える。 */
+function downloadEditingContent() {
+  const blob = new Blob([JSON.stringify(buildPayload(), null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'ryobi-editing-content.json';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function updateErrorReportCard(report, state) {
@@ -654,7 +673,8 @@ function updateErrorReportCard(report, state) {
   if (state !== 'copy_failed') report.notifyState = state;
   const card = document.getElementById('errorReportCard');
   if (!card || card.getAttribute('data-report-id') !== report.id) return;
-  card.querySelector('[data-error-report-notify]').textContent = ERROR_NOTIFY_MESSAGES[state] || '';
+  const notice = card.querySelector('[data-error-report-notify]');
+  if (notice) notice.textContent = ERROR_NOTIFY_MESSAGES[state] || '';
 }
 
 function richTextLinkPattern() {

@@ -38,6 +38,7 @@ async function refreshMetaAfterDraftSave(currentPayload) {
   appState.state = {
     ...(data.state || {}),
     ...(currentPayload || {}),
+    baseVersion: (currentPayload && currentPayload.baseVersion) || '',
     changeLog: (data.state && data.state.changeLog) || appState.state.changeLog || []
   };
   renderAll();

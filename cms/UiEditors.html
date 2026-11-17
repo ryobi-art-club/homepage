@@ -701,7 +701,8 @@ function buildPayload() {
     activityArticles: buildPayloadList('activity'),
     exhibitions: buildPayloadList('exhibition'),
     requestCases: buildPayloadList('request'),
-    manualChangeNote: trimmedText(appState.state.manualChangeNote)
+    manualChangeNote: trimmedText(appState.state.manualChangeNote),
+    baseVersion: appState.state.baseVersion || ''
   };
 }
 </script>

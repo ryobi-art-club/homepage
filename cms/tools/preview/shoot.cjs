@@ -376,7 +376,7 @@ const CATALOG_CSV = '番号,作者,作品名,サイズ,技法\n1,山田 花子,�
     window.MOCK_BACKEND.publishState('', payload);
     const folderAfterPublish = window.PREVIEW_DATA.folders[article().mediaFolderId].map((file) => file.id);
     Object.keys(savedFolders).forEach((id) => { if (id !== article().mediaFolderId) window.PREVIEW_DATA.folders[id] = savedFolders[id]; });
-    window.PREVIEW_DATA.bootstrap.drafts = savedBootstrap.drafts;
+    Object.assign(window.PREVIEW_DATA.bootstrap, savedBootstrap);
     return { before, afterUpload, added, removed, afterDelete, dialogAfterDelete, dialogReopened, previewCount, folderAfterPublish };
   });
   const expected = registration.before.slice(1).concat(registration.added);
@@ -649,6 +649,59 @@ const CATALOG_CSV = '番号,作者,作品名,サイズ,技法\n1,山田 花子,�
   cancelNextConfirm = true;
   await clickId('publishButton');
   if (lastConfirmMessage !== 'この内容で公開しますか？') problems.push('下書きがないのに公開確認に補足があります');
+
+  /* 別の人の公開後、下書き保存を挟んでも古い内容の公開は止まる。入力と手元の控えも確認する。 */
+  step = '古い内容の公開';
+  await load(url);
+  await watchErrors();
+  await page.evaluate(() => {
+    window.MOCK_BACKEND.proofreadForPublish = () => ({ issues: [], cleanFieldIds: [], remainingCount: 0 });
+    activatePanel('exhibitions');
+    setEditorField('exhibition', 0, 'theme', '別の人の公開前から編集していた文章');
+    renderExhibitionsEditor();
+    markDirty();
+    window.PREVIEW_DATA.bootstrap.state.baseVersion = 'another-publication';
+  });
+  const oldBase = await page.evaluate(() => appState.state.baseVersion);
+  await clickId('saveDraftButton', 800);
+  if (await page.evaluate(() => appState.state.baseVersion) !== oldBase) problems.push(step + ': 下書き保存だけで基準を更新しました');
+  const editingBeforeConflict = await page.evaluate(() => JSON.stringify(appState.state));
+  const publishedBeforeConflict = await page.evaluate(() => JSON.stringify(window.PREVIEW_DATA.bootstrap));
+  await clickId('publishButton', 800);
+  const conflictResult = await page.evaluate(() => ({
+    editing: JSON.stringify(appState.state), published: JSON.stringify(window.PREVIEW_DATA.bootstrap),
+    message: document.getElementById('errorReportCard').textContent,
+    notified: window.MOCK_CALLS.some(call => call.name === 'reportError')
+  }));
+  if (conflictResult.editing !== editingBeforeConflict || conflictResult.published !== publishedBeforeConflict || conflictResult.notified || !conflictResult.message.includes('変更を入れ直して')) problems.push(step + ': 競合で内容を変更したか、案内がありません');
+  await shot('desktop-publish-conflict');
+  await setScreen(MOBILE);
+  await shot('mobile-publish-conflict');
+  /* 実際のダウンロードをローカルの見本用フォルダに受け取り、文章と作品・画像参照を照合する。 */
+  await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: fixtures });
+  const editingCopy = path.join(fixtures, 'ryobi-editing-content.json');
+  if (fs.existsSync(editingCopy)) fs.unlinkSync(editingCopy);
+  const expectedCopy = await page.evaluate(() => JSON.stringify(buildPayload()));
+  await page.click('[data-editing-content-download]');
+  for (let i = 0; i < 30 && !fs.existsSync(editingCopy); i++) await wait(100);
+  if (!fs.existsSync(editingCopy) || JSON.stringify(JSON.parse(fs.readFileSync(editingCopy, 'utf8'))) !== expectedCopy) problems.push(step + ': 編集内容の控えが一致しません');
+  await page.evaluate(() => { window.unexpectedErrors.length = 0; });
+  /* 保存した下書きを読み直しても基準は変わらず、版のない既存下書きは最新の基準を借りない。 */
+  await page.evaluate(async () => {
+    const draft = appState.drafts[0];
+    await loadDraftIntoEditor(draft.draftId);
+    if (appState.state.baseVersion === window.PREVIEW_DATA.bootstrap.state.baseVersion) throw new Error('古い下書きの基準が最新になりました');
+    delete window.PREVIEW_DATA.bootstrap.drafts[0].payload.baseVersion;
+    await loadDraftIntoEditor(draft.draftId);
+    if (appState.state.baseVersion !== '') throw new Error('版のない下書きの基準が残っています');
+  });
+  const legacyBefore = await page.evaluate(() => JSON.stringify(window.PREVIEW_DATA.bootstrap));
+  await clickId('publishButton', 800);
+  const legacyAfter = await page.evaluate(() => ({ data: JSON.stringify(window.PREVIEW_DATA.bootstrap), base: appState.state.baseVersion,
+    error: document.getElementById('errorReportCard').textContent }));
+  if (legacyAfter.data !== legacyBefore || legacyAfter.base !== '' || !legacyAfter.error.includes('編集の元の内容')) problems.push(step + ': 基準のない下書きで公開できました');
+  await page.evaluate(() => { window.unexpectedErrors.length = 0; });
+  await setScreen(DESKTOP);
 
   /* 公開の起動だけが失敗した場合と、保存前に失敗した場合を分ける。 */
   step = '公開失敗時の案内';

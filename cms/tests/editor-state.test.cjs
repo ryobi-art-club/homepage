@@ -47,6 +47,71 @@ test('the payload trims text, keeps only the digits of a year and puts lists in 
   assert.equal(payload.manualChangeNote, 'メモ');
 });
 
+test('draft metadata refresh cannot replace a stale or unknown editing base with the latest base', async () => {
+  for (const baseVersion of ['old', '']) {
+    const { ctx, appState } = loadEditors({ activityArticles: [{ title: '編集中' }], baseVersion });
+    const payload = ctx.buildPayload();
+    ctx.serverCall = async () => ({ state: { activityArticles: [{ title: '他の人の公開' }], baseVersion: 'latest' }, drafts: [] });
+    ctx.renderAll = () => {};
+    ctx.clearDirty = () => {};
+    await ctx.refreshMetaAfterDraftSave(payload);
+    assert.equal(appState.state.baseVersion, baseVersion);
+    assert.equal(ctx.buildPayload().baseVersion, baseVersion);
+    assert.equal(appState.state.activityArticles[0].title, '編集中');
+  }
+});
+
+test('loading a legacy draft clears the latest editing base instead of borrowing it', async () => {
+  const { ctx, appState } = loadEditors({ baseVersion: 'latest' });
+  ctx.confirm = () => true;
+  ctx.setStatus = () => {};
+  ctx.renderAll = () => {};
+  ctx.markDirty = () => {};
+  ctx.serverCall = async () => ({ activityArticles: [{ title: '古い下書き' }], baseVersion: '' });
+  await ctx.loadDraftIntoEditor('legacy');
+  assert.equal(appState.state.baseVersion, '');
+  assert.equal(ctx.buildPayload().baseVersion, '');
+});
+
+test('a publication conflict retains the entire editing state and never reloads it', async () => {
+  const { ctx, appState } = loadEditors({ baseVersion: 'old',
+    activityArticles: [{ title: '未保存', body: '本文', mediaFolderId: 'folder', mediaFileIds: ['image'] }],
+    exhibitions: [{ title: '展示', works: [{ fileId: 'work', title: '作品', artist: '作者' }] }] });
+  ctx.buildPayload();
+  const before = plain(appState.state);
+  appState.dirty = true;
+  ctx.confirm = () => true;
+  ctx.runProofreadBeforePublish = async () => [];
+  ctx.setStatus = () => {};
+  ctx.serverCall = async () => { throw new Error('公開内容が更新されたか、編集の元の内容を確認できません。'); };
+  ctx.loadBootstrap = () => assert.fail('競合後に最新内容で置き換えた');
+  let report;
+  ctx.showError = (error, operation) => { report = ctx.describeError(error, operation); };
+  await ctx.publishContent();
+  assert.deepEqual(plain(appState.state), before);
+  assert.equal(appState.dirty, true);
+  assert.equal(report.conflict, true);
+  assert.equal(report.important, false);
+});
+
+test('the local editing copy contains work information and image references without login credentials', async () => {
+  const { ctx, appState } = loadEditors({ baseVersion: 'old', exhibitions: [{ title: '展示',
+    works: [{ fileId: 'work', title: '作品', artist: '作者' }] }] });
+  appState.sessionToken = 'secret-session';
+  let blob, clicked = false, revoked = false;
+  ctx.Blob = class { constructor(parts) { blob = parts.join(''); } };
+  ctx.URL = { createObjectURL: () => 'blob:local', revokeObjectURL: () => { revoked = true; } };
+  ctx.setTimeout = callback => callback();
+  ctx.document.createElement = () => ({ click() { clicked = true; }, remove() {} });
+  ctx.document.body = { appendChild() {} };
+  ctx.downloadEditingContent();
+  assert.equal(JSON.parse(blob).exhibitions[0].works[0].artist, '作者');
+  assert.equal(JSON.parse(blob).exhibitions[0].works[0].fileId, 'work');
+  assert.ok(!blob.includes('secret-session'));
+  assert.equal(clicked, true);
+  assert.equal(revoked, true);
+});
+
 test('a hand-written date line is kept until it is cleared', () => {
   const { ctx } = loadEditors({ exhibitions: [{ startDate: '2026-11-14', dateLine: '11月14日〜（会期は延長予定）' }] });
   assert.equal(ctx.buildPayload().exhibitions[0].dateLine, '11月14日〜（会期は延長予定）');

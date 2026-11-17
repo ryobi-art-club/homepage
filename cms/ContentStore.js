@@ -3,9 +3,9 @@
 // 内容は _PublishedState の1か所にある（docs/reference/data.md）。読めないときは parsePayloadCells_ がエラーで止め、
 // 空の内容を出さない（そのまま公開してサイトを空にしないため）
 // spreadsheet は省略できる。prefetchSheets_ の結果も渡せる
-function readContentState_(spreadsheet) {
+function readContentState_(spreadsheet, publishedInfo) {
   spreadsheet = spreadsheet || SpreadsheetApp.openById(getConfig_().CONTENT_SPREADSHEET_ID);
-  return Object.assign(contentLists_(readPublishedState_(spreadsheet).payload), {
+  return Object.assign(contentLists_((publishedInfo || readPublishedState_(spreadsheet)).payload), {
     changeLog: readChangeLog_(spreadsheet),
     manualChangeNote: ''
   });
@@ -18,8 +18,28 @@ function readPublishedState_(spreadsheet) {
   return {
     payload: buildPublicSnapshot_(requireContentFormat_(parsePayloadCells_(row))),
     sha256: String(row.sha256 || ''),
-    revision: Number(row.revision || 0)
+    revision: Number(row.revision || 0),
+    updatedAt: String(row.updated_at || '')
   };
+}
+
+// シートの巻き戻しと同じ内容での再公開でも、古い画面を区別するための世代。
+// 設定値ではなく実行時の状態。管理者が手で設定・復元しない。
+const CONTENT_EDIT_GENERATION_PROPERTY = 'CONTENT_EDIT_GENERATION';
+
+function buildContentBaseVersion_(publishedInfo) {
+  return sha256Hex_(stableStringify_({
+    generation: PropertiesService.getScriptProperties().getProperty(CONTENT_EDIT_GENERATION_PROPERTY) || '',
+    revision: publishedInfo.revision,
+    updatedAt: publishedInfo.updatedAt,
+    payload: publishedInfo.payload
+  }));
+}
+
+function requireContentBaseVersion_(payload, publishedInfo) {
+  if (!payload || typeof payload.baseVersion !== 'string' || !payload.baseVersion || payload.baseVersion !== buildContentBaseVersion_(publishedInfo)) {
+    throw new Error('公開内容が更新されたか、編集の元の内容を確認できません。');
+  }
 }
 
 function writePublishedState_(payloadJson, sha256) {

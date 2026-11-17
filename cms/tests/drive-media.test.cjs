@@ -338,6 +338,9 @@ test('new exhibitions remain private before publication and retain their IDs aft
 test('sheet failure leaves the empty media folder available for publication retry', () => {
   const { ctx, folder, item, state } = setup();
   item.works = [];
+  const properties = new Map();
+  ctx.Utilities.getUuid = () => 'publication-generation';
+  ctx.PropertiesService = { getScriptProperties: () => ({ getProperty: key => properties.get(key), setProperty: (key, value) => properties.set(key, value) }) };
   ctx.readContentState_ = () => ({ changeLog: [] });
   ctx.normalizePayload_ = payload => JSON.parse(JSON.stringify(payload));
   ctx.readPublishedState_ = () => ({ payload: {}, sha256: '' });
@@ -345,6 +348,7 @@ test('sheet failure leaves the empty media folder available for publication retr
   ctx.stableStringify_ = JSON.stringify;
   ctx.sha256Hex_ = value => value;
   ctx.SpreadsheetApp = { flush() {} };
+  state.baseVersion = ctx.buildContentBaseVersion_(ctx.readPublishedState_());
   ctx.writePublishedState_ = () => { throw new Error('Sheet failure'); };
   assert.throws(() => ctx.publishState('session', state), /Sheet failure/);
   assert.equal(folder.trashed, false);
@@ -358,6 +362,7 @@ test('sheet failure leaves the empty media folder available for publication retr
   ctx.buildAdminDiffSummary_ = () => '';
   ctx.compactContentSheetGrids_ = () => {};
   ctx.dispatchGithubWorkflow_ = () => ({});
+  state.baseVersion = ctx.buildContentBaseVersion_(ctx.readPublishedState_());
   ctx.publishState('session', state);
   assert.equal(snapshot.exhibitions[0].mediaFolderId, '');
   assert.equal(folder.trashed, true);
