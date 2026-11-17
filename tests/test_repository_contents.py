@@ -129,7 +129,8 @@ def check_contents(staged: bool = False) -> list[str]:
         for address in EMAIL.findall(text):
             domain = address.lower().split('@')[1]
             if address.lower() not in allowed and not EXAMPLE_DOMAIN.search(domain):
-                problems.append(f'{name}：メールアドレス {address}')
+                problems.append(f'{name}：メールアドレス')
+                break
         for label, pattern in FORBIDDEN_TEXT.items():
             if pattern.search(text):
                 problems.append(f'{name}：{label}')

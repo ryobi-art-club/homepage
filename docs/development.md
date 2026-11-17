@@ -234,7 +234,7 @@ node tools/screenshot/compare.cjs <控えのフォルダ>          # 作業の�
 
 ### 公開してはいけないものの確認
 
-このリポジトリは公開しています。`tests/test_repository_contents.py` は、次のものが入っていたら失敗します。コミットの前（`.githooks/pre-commit`）は `git add` したコミット予定の内容を、通常のテストとプッシュ・ビルド時（`check.yml`・`deploy.yml`）は作業中のファイルを調べます。通常の検査には、`.gitignore` で除かれていない未追跡ファイルも含めます。
+このリポジトリは公開しています。`tests/test_repository_contents.py` は、次のものが入っていたら失敗します。コミットの前（`.githooks/pre-commit`）は `git add` したコミット予定の内容を、通常のテストとプッシュ・ビルド時（`check.yml`・`deploy.yml`）は作業中のファイルを調べます。通常の検査には、`.gitignore` で除かれていない未追跡ファイルも含めます。検出結果にはファイル名と情報の種類を出し、見つけた値そのものは出しません。
 
 - メールアドレス（見本用に予約されたドメイン（`example.com`・`.test` など）と、サイトに載せている部の連絡先を除く）
 - 管理画面の URL（Apps Script のウェブアプリの URL）
