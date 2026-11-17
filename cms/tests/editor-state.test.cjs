@@ -98,3 +98,25 @@ test('proofreading reads the published texts from the state and writes correctio
   assert.equal(appState.state.activityArticles[1].title, '直した記事');
   assert.equal(appState.state.manualChangeNote, '直したメモ');
 });
+
+test('cancelling publication preserves edits and never starts proofreading or publishing', async () => {
+  const { ctx, appState } = loadEditors({
+    activityArticles: [{ title: '未保存の記事', body: '本文' }],
+    exhibitions: [], recruitCalendars: [], requestCases: []
+  });
+  const before = plain(appState.state);
+  appState.dirty = true;
+  ctx.serverCall = () => assert.fail('取り消した操作からサーバーを呼び出しました');
+  ctx.runProofreadBeforePublish = () => assert.fail('取り消した操作から誤字チェックを呼び出しました');
+  ctx.showError = error => { throw error; };
+  for (const drafts of [[], [{ draftId: 'draft' }]]) {
+    appState.drafts = drafts;
+    ctx.confirm = message => {
+      assert.equal(message, 'この内容で公開しますか？' + (drafts.length ? '\n※保存されているすべての下書きが削除されます' : ''));
+      return false;
+    };
+    await ctx.publishContent();
+    assert.deepEqual(plain(appState.state), before);
+    assert.equal(appState.dirty, true);
+  }
+});

@@ -67,8 +67,15 @@ const CATALOG_CSV = '番号,作者,作品名,サイズ,技法\n1,山田 花子,�
   const problems = [];
   page.on('pageerror', (error) => problems.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') problems.push(message.text()); });
-  /* confirm() は全部「OK」で進める */
-  page.on('dialog', (dialog) => dialog.accept());
+  /* 公開の取り消しを確かめるときだけ「キャンセル」、通常は「OK」で進める。 */
+  let cancelNextConfirm = false;
+  let lastConfirmMessage = '';
+  page.on('dialog', (dialog) => {
+    lastConfirmMessage = dialog.message();
+    const cancel = cancelNextConfirm;
+    cancelNextConfirm = false;
+    return cancel ? dialog.dismiss() : dialog.accept();
+  });
 
   /* どの関数が動いたかの記録は、ページを読み込むたびに消えるので、その前に集める */
   const coverage = [];
@@ -600,6 +607,13 @@ const CATALOG_CSV = '番号,作者,作品名,サイズ,技法\n1,山田 花子,�
 
   /* 公開：偽の誤字チェックは、いつも3項目までに指摘を付ける */
   step = '公開';
+  const beforeCancel = await page.evaluate(() => ({ state: JSON.stringify(appState.state), calls: window.MOCK_CALLS.length }));
+  cancelNextConfirm = true;
+  await clickId('publishButton');
+  const afterCancel = await page.evaluate(() => ({ state: JSON.stringify(appState.state), calls: window.MOCK_CALLS.length,
+    unlocked: ['saveDraftButton', 'publishButton'].every((id) => !document.getElementById(id).disabled) }));
+  if (beforeCancel.state !== afterCancel.state || beforeCancel.calls !== afterCancel.calls || !afterCancel.unlocked) problems.push(step + ': 公開を取り消したのに内容・通信・ボタンの状態が変わりました');
+  if (lastConfirmMessage !== 'この内容で公開しますか？\n※保存されているすべての下書きが削除されます') problems.push(step + ': 下書きがあるときの公開確認が違います');
   await clickId('publishButton', 800);
   /* 公開の途中は、保存も公開も押せない */
   const locked = await page.evaluate(() => ['saveDraftButton', 'publishButton'].every((id) => document.getElementById(id).disabled));
@@ -630,6 +644,59 @@ const CATALOG_CSV = '番号,作者,作品名,サイズ,技法\n1,山田 花子,�
   await page.click('[data-proofread-action="publish"]');
   await wait(1000);
   await checkErrors();
+
+  /* 下書きがないときは、公開確認の補足を表示しない。 */
+  cancelNextConfirm = true;
+  await clickId('publishButton');
+  if (lastConfirmMessage !== 'この内容で公開しますか？') problems.push('下書きがないのに公開確認に補足があります');
+
+  /* 公開の起動だけが失敗した場合と、保存前に失敗した場合を分ける。 */
+  step = '公開失敗時の案内';
+  await load(url);
+  await watchErrors();
+  await page.evaluate(() => {
+    window.MOCK_BACKEND.proofreadForPublish = () => ({ issues: [], cleanFieldIds: [], remainingCount: 0 });
+    window.MOCK_BACKEND.publishFailure = 'before-save';
+  });
+  const beforeFailure = await page.evaluate(() => JSON.stringify(window.PREVIEW_DATA.bootstrap));
+  await clickId('publishButton', 800);
+  const failedBeforeSave = await page.evaluate(() => ({ data: JSON.stringify(window.PREVIEW_DATA.bootstrap), hint: document.getElementById('errorReportCard').textContent }));
+  if (failedBeforeSave.data !== beforeFailure || failedBeforeSave.hint.includes('保存済み')) problems.push(step + ': 保存前の失敗を保存済みとして扱いました');
+  await page.evaluate(() => { window.unexpectedErrors.length = 0; window.MOCK_BACKEND.publishFailure = 'github'; });
+  await clickId('publishButton', 800);
+  const githubFailure = await page.evaluate(() => ({ hint: document.getElementById('errorReportCard').textContent, drafts: window.PREVIEW_DATA.bootstrap.drafts.length,
+    publishCalls: window.MOCK_CALLS.filter((call) => call.name === 'publishState').length }));
+  if (!githubFailure.hint.includes('保存済み') || githubFailure.hint.includes('もう一度公開せず') || githubFailure.drafts || githubFailure.publishCalls !== 2) problems.push(step + ': 起動失敗時の案内・下書き・呼び出し回数が違います');
+  await shot('desktop-publish-start-failure');
+  await setScreen(MOBILE);
+  await shot('mobile-publish-start-failure');
+  await page.evaluate(() => { window.unexpectedErrors.length = 0; });
+
+  /* 期限切れの保存失敗でも、入力と画像参照は画面に残し、再読み込みを自動で行わない。 */
+  step = '編集中のログイン期限切れ';
+  await setScreen(DESKTOP);
+  await load(url);
+  await watchErrors();
+  await page.evaluate(() => {
+    activatePanel('activities');
+    setEditorField('activity', 0, 'body', '期限切れ前の未保存の文章');
+    renderActivitiesEditor();
+    markDirty();
+    window.MOCK_BACKEND.sessionExpired = true;
+  });
+  const unsaved = await page.evaluate(() => JSON.stringify(appState.state));
+  await clickId('saveDraftButton', 800);
+  const expiredEdit = await page.evaluate(() => ({ state: JSON.stringify(appState.state), dirty: appState.dirty, appVisible: !document.getElementById('appShell').classList.contains('hidden'),
+    hint: document.getElementById('statusMessage').textContent }));
+  if (expiredEdit.state !== unsaved || !expiredEdit.dirty || !expiredEdit.appVisible || !expiredEdit.hint.includes('未保存の内容を控えてから')) problems.push(step + ': 期限切れで入力内容を失ったか、退避の案内がありません');
+  await page.click('#statusMessage .status-detail-button');
+  await shot('desktop-session-unsaved');
+  await setScreen(MOBILE);
+  await shot('mobile-session-unsaved');
+  await page.evaluate(() => { window.unexpectedErrors.length = 0; });
+  await setScreen(DESKTOP);
+  await load(url);
+  await watchErrors();
 
   /* --- エラーの表示 --- */
   step = 'エラー表示';
@@ -691,6 +758,8 @@ const CATALOG_CSV = '番号,作者,作品名,サイズ,技法\n1,山田 花子,�
   /* 読み込み直しても、有効期限の間はログインが続く。期限が切れていれば、エラーを出さずにログイン画面に戻る */
   step = 'ログインの維持';
   await page.evaluate(() => { const card = document.getElementById('errorReportCard'); if (card) card.remove(); });
+  /* 見本画面の自動ログインを止め、記憶したログインだけで再開する。 */
+  await page.evaluate(() => { rememberSession(); location.hash = 'login'; });
   await reloadKeepingSession();
   await watchErrors();
   const shells = () => page.evaluate(() => ({

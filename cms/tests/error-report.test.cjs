@@ -58,6 +58,25 @@ test('system-side errors are important and explain what to do next', () => {
   assert.match(excel.hint, /CSV/);
 });
 
+test('only known build startup failures during publishing are described as saved', () => {
+  const ctx = loadClient();
+  for (const message of [
+    'GitHub Actions の起動に失敗しました: 401',
+    'GitHub App の installation token 取得に失敗しました: 403',
+    'GitHub App 用の Script Properties が不足しています。'
+  ]) {
+    const failure = ctx.describeError(new Error(message), '公開');
+    assert.equal(failure.important, true);
+    assert.match(failure.hint, /保存済み/);
+    assert.doesNotMatch(failure.hint, /もう一度公開せず/);
+    assert.doesNotMatch(ctx.describeError(new Error(message), 'データの読み込み').hint, /保存済み/);
+  }
+  for (const message of ['GitHub との通信に失敗しました', 'GH_APP_ID の設定を確認してください',
+    'Script Properties が不足しています。', 'ファイル取得に失敗しました: timeout', 'Failed to fetch']) {
+    assert.doesNotMatch(ctx.describeError(new Error(message), '公開').hint, /保存済み/);
+  }
+});
+
 test('user-side errors are not sent to the administrator', () => {
   const ctx = loadClient();
   for (const message of ['セッションが切れています。もう一度認証してください。', 'アップロードするファイルを選択してください。',

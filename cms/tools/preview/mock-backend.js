@@ -57,10 +57,12 @@
       return { notified: false, reason: mode };
     },
     saveDraft: (_, payload) => {
+      if (window.MOCK_BACKEND.sessionExpired) throw new Error('セッションが切れています。もう一度認証してください。');
       data.bootstrap.drafts.unshift({ draftId: nextId('d'), savedAt: new Date().toISOString(), savedByName: data.bootstrap.viewerName, savedByEmail: data.bootstrap.viewerEmail, payload: clone(payload) });
       return { ok: true, message: '下書きを保存しました。' };
     },
     publishState: (_, payload) => {
+      if (window.MOCK_BACKEND.publishFailure === 'before-save') throw new Error('ファイル取得に失敗しました: プレビュー用');
       const summary = '[プレビュー] 公開内容を更新';
       data.bootstrap.state = Object.assign({}, data.bootstrap.state, clone(payload));
       data.bootstrap.state.changeLog = [{ timestamp: new Date().toISOString(), kind: 'note', itemId: '', note: summary, actorName: data.bootstrap.viewerName }].concat(data.bootstrap.state.changeLog || []);
@@ -80,6 +82,7 @@
       (state.exhibitions || []).concat(state.activityArticles || [], state.requestCases || []).filter((item) => item.published !== false)
         .forEach((item) => publicFolders.add(item.mediaFolderId));
       (state.recruitCalendars || []).filter((item) => item.published === true).forEach((item) => publicFolders.add(item.mediaFolderId));
+      if (window.MOCK_BACKEND.publishFailure === 'github') throw new Error('GitHub Actions の起動に失敗しました: プレビュー用');
       return { ok: true, message: '公開を開始しました。', changeSummary: summary, actionsUrl: '#' };
     },
     uploadManagedFiles: (_, request) => {
@@ -132,6 +135,9 @@
       return handler(...args);
     };
   });
+  /* 失敗する段階と、編集途中の期限切れを撮影手順から指定する。通常は成功する。 */
+  window.MOCK_BACKEND.publishFailure = '';
+  window.MOCK_BACKEND.sessionExpired = false;
   document.title = '[プレビュー] ' + document.title;
   /* #login を付けて開くとログイン画面から始める（確認コードは何を入れても通る） */
   if (location.hash === '#login') return;

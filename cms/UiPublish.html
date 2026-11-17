@@ -266,7 +266,8 @@ async function publishContent() {
   try {
     let payload = buildPayload();
     if (!validatePayloadForSubmit(payload)) return;
-    if (!confirm('この内容で公開しますか？')) return;
+    const draftNote = appState.drafts.length ? '\n※保存されているすべての下書きが削除されます' : '';
+    if (!confirm('この内容で公開しますか？' + draftNote)) return;
     const proofreadTexts = await runProofreadBeforePublish();
     if (!proofreadTexts) return;
     payload = buildPayload();
