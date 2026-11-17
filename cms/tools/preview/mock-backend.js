@@ -52,6 +52,7 @@
       const mode = window.MOCK_BACKEND.notifyMode;
       if (mode === 'sent') return { notified: true };
       if (mode === 'duplicate') return { notified: true, duplicate: true };
+      if (mode === 'pending') return { notified: false, reason: 'failed' };
       if (mode === 'failed') throw new Error('プレビュー: 通知に失敗した場合の表示です。');
       return { notified: false, reason: mode };
     },

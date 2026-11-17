@@ -13,6 +13,7 @@ function loadServer({ recipient = 'admin@example.com', quota = 100 } = {}) {
   const mails = [];
   const ctx = vm.createContext({
     console: { error() {} },
+    LockService: sources.createLockService(),
     CacheService: {
       getScriptCache: () => ({
         get: key => (store.has(key) ? store.get(key) : null),
@@ -28,6 +29,7 @@ function loadServer({ recipient = 'admin@example.com', quota = 100 } = {}) {
       getRemainingDailyQuota: () => quota
     },
     Utilities: {
+      getUuid: () => crypto.randomUUID(),
       DigestAlgorithm: { SHA_256: 'sha256' },
       Charset: { UTF_8: 'utf8' },
       computeDigest: (_, value) => Array.from(crypto.createHash('sha256').update(value, 'utf8').digest(), b => (b > 127 ? b - 256 : b))

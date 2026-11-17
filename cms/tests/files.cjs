@@ -31,4 +31,24 @@ function loadClient(globals = {}) {
   return ctx;
 }
 
-module.exports = { loadServer, uiScriptFiles, uiScriptSource, loadClient, read };
+// 順次テスト用。競合のテストは concurrent-server.js で独立した実行を使う
+function createLockService() {
+  let held = false;
+  return { getScriptLock: () => ({
+    waitLock() {
+      if (held) throw new Error('Lock timeout');
+      held = true;
+    },
+    tryLock() {
+      if (held) return false;
+      held = true;
+      return true;
+    },
+    releaseLock() {
+      if (!held) throw new Error('取得していないロックです');
+      held = false;
+    }
+  }) };
+}
+
+module.exports = { loadServer, uiScriptFiles, uiScriptSource, loadClient, read, createLockService };

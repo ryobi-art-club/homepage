@@ -661,6 +661,16 @@ const CATALOG_CSV = '番号,作者,作品名,サイズ,技法\n1,山田 花子,�
   await page.evaluate(errors[1][1]);
   await wait(200);
   await shot('error-2-system-notified');
+  /* 別の通知が送信中でも、通知済みとは表示しない */
+  await page.evaluate(() => { window.MOCK_BACKEND.notifyMode = 'pending'; });
+  const pendingReport = await page.evaluate(() => {
+    const report = showError(new Error('GitHub Actions の起動に失敗しました: pending'), '公開');
+    window.previewPendingReport = report;
+    return report.id;
+  });
+  await page.waitForFunction(() => window.previewPendingReport.notifyState === 'failed');
+  const pendingCard = await page.evaluate(() => document.getElementById('errorReportCard').textContent);
+  if (!pendingCard.includes('管理者へ自動で通知できませんでした。')) problems.push('送信中の通知を通知済みとして表示しました: ' + pendingReport);
   await page.evaluate(() => { window.MOCK_BACKEND.notifyMode = 'not_configured'; });
   await page.evaluate(errors[1][1]);
   await wait(200);

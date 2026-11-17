@@ -33,22 +33,22 @@ function requestOtp(email) {
     throw new Error('メールアドレスの形式が正しくありません。');
   }
   const cache = CacheService.getScriptCache();
-  if (isOtpLocked_(cache, normalizedEmail)) throw new Error(OTP_LOCKED_MESSAGE);
-  const reqCountKey = 'otp_req:' + normalizedEmail;
-  const reqCount = parseInt(cache.get(reqCountKey) || '0', 10);
-  if (reqCount >= OTP_REQUEST_LIMIT) {
-    throw new Error('確認コードの送信回数が上限に達しました。しばらく時間をおいてから再試行してください。');
-  }
-  cache.put(reqCountKey, String(reqCount + 1), OTP_REQUEST_WINDOW_SECONDS);
-
   const code = generateOtpCode_();
-  const record = {
-    email: normalizedEmail,
-    codeHash: sha256Hex_(code),
-    expiresAt: Date.now() + OTP_TTL_MINUTES * 60 * 1000,
-    attempts: 0
-  };
-  cache.put('otp:' + normalizedEmail, JSON.stringify(record), OTP_TTL_MINUTES * 60);
+  withCacheLock_(() => {
+    if (isOtpLocked_(cache, normalizedEmail)) throw new Error(OTP_LOCKED_MESSAGE);
+    const reqCountKey = 'otp_req:' + normalizedEmail;
+    const reqCount = parseInt(cache.get(reqCountKey) || '0', 10);
+    if (reqCount >= OTP_REQUEST_LIMIT) {
+      throw new Error('確認コードの送信回数が上限に達しました。しばらく時間をおいてから再試行してください。');
+    }
+    cache.put(reqCountKey, String(reqCount + 1), OTP_REQUEST_WINDOW_SECONDS);
+    cache.put('otp:' + normalizedEmail, JSON.stringify({
+      email: normalizedEmail,
+      codeHash: sha256Hex_(code),
+      expiresAt: Date.now() + OTP_TTL_MINUTES * 60 * 1000,
+      attempts: 0
+    }), OTP_TTL_MINUTES * 60);
+  });
 
   if (readAllowedUser_(normalizedEmail)) {
     const started = Date.now();
@@ -72,46 +72,50 @@ function verifyOtp(email, code) {
   const config = getConfig_();
   const normalizedEmail = normalizeEmail_(email);
   const cache = CacheService.getScriptCache();
+  // コードがない要求ではシートを読まない。ここで読んだ状態は後の書込みには使わない
   if (isOtpLocked_(cache, normalizedEmail)) throw new Error(OTP_LOCKED_MESSAGE);
-  const raw = cache.get('otp:' + normalizedEmail);
-  if (!raw) {
+  if (!cache.get('otp:' + normalizedEmail)) {
     throw new Error('確認コードの有効期限が切れています。もう一度取得してください。');
   }
-  const record = JSON.parse(raw);
-  if (Date.now() > record.expiresAt) {
-    cache.remove('otp:' + normalizedEmail);
-    throw new Error('確認コードの有効期限が切れています。');
-  }
-  if (record.attempts >= 5) {
-    cache.remove('otp:' + normalizedEmail);
-    throw new Error('確認コードの入力回数が上限に達しました。');
-  }
-  /* 許可リストにないアドレスは、コードが当たっても通さない（違うコードと同じ扱い） */
   const allowed = readAllowedUser_(normalizedEmail);
-  if (!allowed || sha256Hex_(String(code || '').trim()) !== record.codeHash) {
-    record.attempts += 1;
-    cache.put('otp:' + normalizedEmail, JSON.stringify(record), Math.max(60, Math.floor((record.expiresAt - Date.now()) / 1000)));
-    if (countOtpFailure_(cache, normalizedEmail)) throw new Error(OTP_LOCKED_MESSAGE);
-    throw new Error('確認コードが一致しません。');
+  const result = withCacheLock_(() => {
+    if (isOtpLocked_(cache, normalizedEmail)) throw new Error(OTP_LOCKED_MESSAGE);
+    const raw = cache.get('otp:' + normalizedEmail);
+    if (!raw) throw new Error('確認コードの有効期限が切れています。もう一度取得してください。');
+    const record = JSON.parse(raw);
+    if (Date.now() > record.expiresAt) {
+      cache.remove('otp:' + normalizedEmail);
+      throw new Error('確認コードの有効期限が切れています。');
+    }
+    if (record.attempts >= 5) {
+      cache.remove('otp:' + normalizedEmail);
+      throw new Error('確認コードの入力回数が上限に達しました。');
+    }
+    /* 許可リストにないアドレスは、コードが当たっても通さない */
+    if (!allowed || sha256Hex_(String(code || '').trim()) !== record.codeHash) {
+      record.attempts += 1;
+      cache.put('otp:' + normalizedEmail, JSON.stringify(record), Math.max(60, Math.floor((record.expiresAt - Date.now()) / 1000)));
+      const locked = countOtpFailure_(cache, normalizedEmail);
+      return { errorMessage: locked ? OTP_LOCKED_MESSAGE : '確認コードが一致しません。', notifyLocked: locked };
+    }
+
+    cache.remove('otp:' + normalizedEmail);
+    cache.remove('otp_req:' + normalizedEmail);
+    cache.remove('otp_fail:' + normalizedEmail);
+    const sessionToken = Utilities.getUuid() + '-' + Utilities.getUuid();
+    cache.put('session:' + sessionToken, JSON.stringify({
+      email: normalizedEmail,
+      name: allowed.name || normalizedEmail,
+      issuedAt: Date.now()
+    }), config.SESSION_TTL_MINUTES * 60);
+    return { ok: true, sessionToken, email: normalizedEmail,
+      name: allowed.name || normalizedEmail, expiresInMinutes: config.SESSION_TTL_MINUTES };
+  });
+  if (result.errorMessage) {
+    if (result.notifyLocked && allowed) notifyOtpLocked_(normalizedEmail);
+    throw new Error(result.errorMessage);
   }
-
-  cache.remove('otp:' + normalizedEmail);
-  cache.remove('otp_req:' + normalizedEmail);
-  cache.remove('otp_fail:' + normalizedEmail);
-  const sessionToken = Utilities.getUuid() + '-' + Utilities.getUuid();
-  cache.put('session:' + sessionToken, JSON.stringify({
-    email: normalizedEmail,
-    name: allowed.name || normalizedEmail,
-    issuedAt: Date.now()
-  }), config.SESSION_TTL_MINUTES * 60);
-
-  return {
-    ok: true,
-    sessionToken: sessionToken,
-    email: normalizedEmail,
-    name: allowed.name || normalizedEmail,
-    expiresInMinutes: config.SESSION_TTL_MINUTES
-  };
+  return result;
 }
 
 // 6桁の確認コード。Math.random は予測されにくさを保証しないので、ランダムな UUID の先頭12桁（48ビット）から作る
@@ -120,8 +124,15 @@ function generateOtpCode_() {
 }
 
 function rememberOtpMailTime_(cache, ms) {
-  const times = JSON.parse(cache.get('otp_mail_ms') || '[]').concat([ms]).slice(-OTP_MAIL_TIMES_KEPT);
-  cache.put('otp_mail_ms', JSON.stringify(times), OTP_FAILURE_WINDOW_SECONDS);
+  const lock = LockService.getScriptLock();
+  // 時間の見本を残すためだけに、送信後の返答を待たせない
+  if (!lock.tryLock(0)) return;
+  try {
+    const times = JSON.parse(cache.get('otp_mail_ms') || '[]').concat([ms]).slice(-OTP_MAIL_TIMES_KEPT);
+    cache.put('otp_mail_ms', JSON.stringify(times), OTP_FAILURE_WINDOW_SECONDS);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function pickOtpMailTime_(cache) {
@@ -134,18 +145,20 @@ function isOtpLocked_(cache, email) {
   return parseInt(cache.get('otp_fail:' + email) || '0', 10) >= OTP_FAILURE_LIMIT;
 }
 
-// 外れを1つ数える。ちょうど上限に達したら、今のコードを無効にして true を返す。
-// 管理者に知らせるのは部員のアドレスのときだけ（許可リストにないアドレスを次々に試されて、
-// 管理者へのメールで1日のメールの上限を使い切られないように。外から見える動きはどちらも同じ）
+// 外れを1つ数え、上限に達したらコードを無効にする。呼び出す側でロックを持つ
 function countOtpFailure_(cache, email) {
   const failures = parseInt(cache.get('otp_fail:' + email) || '0', 10) + 1;
   cache.put('otp_fail:' + email, String(failures), OTP_FAILURE_WINDOW_SECONDS);
   if (failures < OTP_FAILURE_LIMIT) return false;
   cache.remove('otp:' + email);
-  if (readAllowedUser_(email)) sendAdminMail_('確認コードの入力が続けて違っていました',
+  return true;
+}
+
+// 停止を確定した実行だけが、ロックを解放してから知らせる
+function notifyOtpLocked_(email) {
+  sendAdminMail_('確認コードの入力が続けて違っていました',
     email + ' で、確認コードの入力が ' + OTP_FAILURE_LIMIT + ' 回違っていたため、このメールアドレスのログインを最長6時間止めました。\n' +
     '本人が入力を間違えただけなら、時間をおけばまたログインできます。心当たりがないときは、誰かがこのメールアドレスでログインしようとしている可能性があります。');
-  return true;
 }
 
 function requireSession_(sessionToken) {

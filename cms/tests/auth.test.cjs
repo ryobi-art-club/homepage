@@ -11,6 +11,7 @@ function setup() {
   const sleeps = [];
   const ctx = vm.createContext({
     console: { error() {}, warn() {} },
+    LockService: sources.createLockService(),
     CacheService: {
       getScriptCache: () => ({
         get: key => (store.has(key) ? store.get(key) : null),

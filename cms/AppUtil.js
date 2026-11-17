@@ -67,3 +67,16 @@ function sortDeep_(value) {
   }
   return value;
 }
+
+// キャッシュの確認と更新だけを保護する。シート読込・送信・待機は外で行う
+const CACHE_LOCK_WAIT_MS = 30000;
+
+function withCacheLock_(operation) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(CACHE_LOCK_WAIT_MS);
+  try {
+    return operation();
+  } finally {
+    lock.releaseLock();
+  }
+}

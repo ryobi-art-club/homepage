@@ -16,7 +16,7 @@ node tools/preview/build.cjs
 
 `tools/preview/out/preview.html` をブラウザで開くと、ログイン後の画面が表示されます。
 URL の末尾に `#login` を付けて開くと、ログイン画面から始まります。確認コードは何を入れても通ります。
-管理者へのエラー自動通知の結果は、URL に `?notify=sent` のように付けて切り替えられます（`sent` 通知済み / `duplicate` 通知済みの重複 / `limit` 上限 / `failed` 失敗 / 付けなければ `not_configured` 未設定）。開いたあとでも、ブラウザのコンソールで `MOCK_BACKEND.notifyMode = 'sent'` と入力すれば切り替わります。
+管理者へのエラー自動通知の結果は、URL に `?notify=sent` のように付けて切り替えられます（`sent` 通知済み / `duplicate` 通知済みの重複 / `limit` 上限 / `failed` 失敗 / `pending` 同じ通知が送信中（未通知の案内） / 付けなければ `not_configured` 未設定）。開いたあとでも、ブラウザのコンソールで `MOCK_BACKEND.notifyMode = 'sent'` と入力すれば切り替わります。
 画面のスクリプトや `UiStyles.html` を変更したら、もう一度実行してください（1秒かかりません）。
 スマホの表示は、Chrome の検証ツールでデバイスモードにして、機種（iPhone SE など）を選んで確認できます。本番の `doGet()` と同じく、画面の幅に合わせる指定（viewport）を入れてあります。
 
