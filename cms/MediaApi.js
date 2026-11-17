@@ -102,6 +102,7 @@ function getFolderMedia_(folderId) {
   if (!folderId) return [];
 
   const folder = getDriveFolderWithRetry_(folderId, '画像フォルダ取得');
+  requireManagedItemFolder_(folder);
   const files = [];
   mediaSourceFolders_(folder).forEach((source) => {
     // public：フォルダが「リンクを知っている全員」で、ブラウザが Drive のサムネイルを直接読める

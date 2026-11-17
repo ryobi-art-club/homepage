@@ -121,7 +121,7 @@ function setup() {
       files: names.map(name => ({ name, mimeType: 'image/jpeg', data: 'eA==' })), ...extra
     });
   }
-  return { ctx, root, folder, image, item, state, folders, files, File, Folder, activityRoot, recruitRoot, upload,
+  return { ctx, root, folder, image, item, state, folders, files, File, Folder, activityRoot, recruitRoot, requestRoot, upload,
     failUpload: name => { failingName = name; }, isLocked: () => locked };
 }
 
@@ -131,6 +131,67 @@ const ids = folder => {
   while (it.hasNext()) values.push(it.next().id);
   return values.sort();
 };
+
+test('画像一覧は4種類のルート直下にある未保存の項目フォルダも取得できる', () => {
+  const { ctx, root, activityRoot, recruitRoot, requestRoot, File } = setup();
+  for (const parent of [root, activityRoot, recruitRoot, requestRoot]) {
+    const folder = parent.createFolder('追加したばかりの項目');
+    const image = new File('photo.jpg', folder);
+    const result = ctx.getFolderMedia('session', folder.id);
+    assert.deepEqual(Array.from(result, file => file.id), [image.id]);
+    assert.equal(result[0].public, false);
+    assert.equal(result[0].folderId, folder.id);
+  }
+});
+
+test('画像一覧は項目と一時置き場・退避先の画像とPDFをまとめて返す', () => {
+  const { ctx, folder, image, File } = setup();
+  image.setName('10_original.jpg');
+  const staging = ctx.getMediaAuxFolder_(folder.id, 'staging', true);
+  const recovery = ctx.getMediaAuxFolder_(folder.id, 'recovery', true);
+  const staged = new File('2_staged.jpg', staging);
+  const recovered = new File('1_recovered.pdf', recovery, 'application/pdf');
+  new File('ignored.txt', folder, 'text/plain');
+  const result = ctx.getFolderMedia('session', folder.id);
+  assert.deepEqual(Array.from(result, file => file.id), [recovered.id, staged.id, image.id]);
+  assert.deepEqual(Array.from(result, file => file.kind), ['pdf', 'image', 'image']);
+  assert.deepEqual(Array.from(result, file => file.public), [false, false, true]);
+  assert.ok(result.every(file => file.folderId === folder.id));
+  assert.equal(image.parent, folder);
+  assert.equal(staged.parent, staging);
+  assert.equal(recovered.parent, recovery);
+});
+
+test('フォルダ未登録ならDriveを読まず空の一覧を返し、認証は省略しない', () => {
+  const { ctx, folder } = setup();
+  ctx.DriveApp.getFolderById = () => assert.fail('未登録ならDriveへ問い合わせない');
+  for (const folderId of ['', null, undefined]) {
+    assert.deepEqual(Array.from(ctx.getFolderMedia('session', folderId)), []);
+  }
+  ctx.requireSession_ = () => { throw new Error('セッションが切れています'); };
+  assert.throws(() => ctx.getFolderMedia('invalid', ''), /セッションが切れています/);
+  assert.throws(() => ctx.getFolderMedia('invalid', folder.id), /セッションが切れています/);
+});
+
+test('対象外・ルート・補助・入れ子・ゴミ箱のフォルダはファイルを列挙する前に拒否する', () => {
+  const { ctx, root, activityRoot, recruitRoot, requestRoot, folder, Folder } = setup();
+  const outside = new Folder('管理対象外');
+  const foreignChild = outside.createFolder('対象外の子');
+  const nested = folder.createFolder('項目の中の子');
+  const trashed = root.createFolder('削除した項目').setTrashed(true);
+  const staging = ctx.getMediaAuxFolder_(folder.id, 'staging', true);
+  const recovery = ctx.getMediaAuxFolder_(folder.id, 'recovery', true);
+  for (const rejected of [outside, foreignChild, root, activityRoot, recruitRoot, requestRoot, nested, trashed, staging, recovery]) {
+    rejected.getFiles = () => assert.fail('対象外のファイルを列挙してはいけない');
+    assert.throws(() => ctx.getFolderMedia('session', rejected.id), /画像のフォルダが見つかりません/);
+  }
+});
+
+test('存在しないIDの画像一覧は取得エラーを返す', () => {
+  const { ctx } = setup();
+  ctx.mediaSourceFolders_ = () => assert.fail('取得できないフォルダは列挙しない');
+  assert.throws(() => ctx.getFolderMedia('session', 'missing-folder'), /画像フォルダ取得に失敗しました/);
+});
 
 test('uploads reuse private staging without changing public folder or existing IDs', () => {
   const { ctx, folder, image, upload, files, isLocked } = setup();
